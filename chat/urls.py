@@ -18,6 +18,5 @@ urlpatterns = [
     path('chats/create/', views.ChatCreate.as_view(), name='chat-create'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('users/create/', views.UserCreate.as_view(), name='user-create'),
-    
     path('', views.index, name='index'),
 ]

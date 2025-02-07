@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Chat from './Chat';
+import { Cloudinary } from "@cloudinary/url-gen";
+import { AdvancedImage } from '@cloudinary/react';
+import { fill } from "@cloudinary/url-gen/actions/resize";
 
 function ChatList({ logout, username }) {
   const navigate = useNavigate();
@@ -10,6 +13,25 @@ function ChatList({ logout, username }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const token = localStorage.getItem('token');
+  const [defaultProfileImage, setDefaultProfileImage] = useState(null);
+
+  useEffect(() => {
+    console.log('Cloudinary useEffect called');
+    try {
+      const cld = new Cloudinary({
+        cloud: {
+          cloudName: 'dfxbvixpv'
+        }
+      });
+
+      const image = cld.image('unisex_default_profile_picture_zovdsw');
+      image.resize(fill().width(100).height(100));
+      setDefaultProfileImage(image);
+      console.log('defaultProfileImage set:', image);
+    } catch (error) {
+      console.error('Error initializing Cloudinary:', error);
+    }
+  }, []);
 
   const fetchChats = useCallback(async () => {
     try {
@@ -115,9 +137,9 @@ function ChatList({ logout, username }) {
       <div className="absolute top-4 right-4">
         <button
           onClick={() => navigate('/profile')}
-          className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors"
+          className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors overflow-hidden"
         >
-          {username ? username.charAt(0).toUpperCase() : '?'}
+          {defaultProfileImage && <AdvancedImage cldImg={defaultProfileImage} alt="Profile" className="w-full h-full object-cover" />}
         </button>
       </div>
 

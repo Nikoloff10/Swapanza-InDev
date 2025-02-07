@@ -6,10 +6,12 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     confirm_password = serializers.CharField(write_only=True, style={'input_type': 'password'}, required=False)
     email = serializers.EmailField(required=True)
+    profile_image_url = serializers.URLField(read_only=True)
+
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'password', 'confirm_password')
+        fields = ('username', 'email', 'password', 'confirm_password', 'profile_image_url')
 
     def validate(self, data):
         if data.get('password') != data.get('confirm_password'):

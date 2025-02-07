@@ -8,6 +8,8 @@ from .models import Chat, User, Message
 from .serializers import ChatSerializer, UserSerializer, MessageSerializer
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 class UserCreate(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -167,6 +169,13 @@ class ChatSwitchView(generics.UpdateAPIView):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def profile(request):
+    user = request.user
+    serializer = UserSerializer(user)
+    return Response(serializer.data)
 
 def index(request):
     try:

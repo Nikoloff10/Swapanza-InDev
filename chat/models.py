@@ -4,6 +4,11 @@ from django.core.exceptions import ValidationError
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
+    profile_image_public_id = models.CharField(max_length=255, blank=True, null=True)  
+    profile_image_url = models.URLField(blank=True, null=True)  
+
+    def __str__(self):
+        return self.username
 
 class Chat(models.Model):
     participants = models.ManyToManyField(User, related_name='chats')

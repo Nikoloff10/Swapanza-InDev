@@ -21,5 +21,6 @@ urlpatterns = [
     path('users/create/', views.UserCreate.as_view(), name='user-create'),
     path('chats/<int:pk>/switch/', views.ChatSwitchView.as_view(), name='chat-switch'),
     path('messages/create/', views.MessageCreate.as_view(), name='message-create'),
+    path('profile/', views.profile, name='profile'),
     path('', views.index, name='index'),
 ]

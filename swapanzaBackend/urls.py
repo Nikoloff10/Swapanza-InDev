@@ -1,14 +1,9 @@
 from django.contrib import admin
-from django.urls import path, include
-
-from chat import views
-from chat.views import index
-
-
+from django.urls import path, include, re_path
+from django.views.generic import TemplateView
 
 urlpatterns = [
-    path('', include('chat.urls')),
     path('admin/', admin.site.urls),
     path('api/', include('chat.urls')),
-    path('login/', views.index, name='login'),
+    re_path(r'^(?!api/|admin/).*$', TemplateView.as_view(template_name='index.html'), name='home'),
 ]

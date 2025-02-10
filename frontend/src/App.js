@@ -1,51 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import axios from 'axios';
-import Home from './components/Home';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import RegistrationForm from './components/RegistrationForm';
 import ChatList from './components/ChatList';
 import Profile from './components/Profile';
+import Home from './components/Home';
 
 function App() {
   const [isAuth, setIsAuth] = useState(!!localStorage.getItem('token'));
   const [username, setUsername] = useState(localStorage.getItem('username') || '');
 
-  useEffect(() => {
-    const storedUsername = localStorage.getItem('username');
-    if (storedUsername) {
-      setUsername(storedUsername);
-    }
-  }, []);
-
-  const login = (token) => {
+  const login = (token, username) => {
     localStorage.setItem('token', token);
-    const storedUsername = localStorage.getItem('username');
-    if (storedUsername) {
-      setUsername(storedUsername);
-    }
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    localStorage.setItem('username', username);
     setIsAuth(true);
+    setUsername(username);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    delete axios.defaults.headers.common['Authorization'];
     setIsAuth(false);
     setUsername('');
   };
 
+  useEffect(() => {
+    setIsAuth(!!localStorage.getItem('token'));
+    setUsername(localStorage.getItem('username') || '');
+  }, []);
+
   return (
     <Router>
       <Routes>
-        <Route
-          path="/"
-          element={isAuth ? <Navigate to="/chats" replace /> : <Home />}
-        />
+        <Route path="/" element={<Home />} />
         <Route
           path="/login"
-          element={<LoginForm login={login} />}
+          element={isAuth ? <Navigate to="/chats" replace /> : <LoginForm login={login} />}
         />
         <Route
           path="/register"

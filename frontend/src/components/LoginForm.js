@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-
-function LoginForm({ login }) {  
+function LoginForm({ login }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -23,10 +22,23 @@ function LoginForm({ login }) {
         password
       });
 
-      
-      login(response.data.access);
-      
-      
+      const token = response.data.access;
+
+      // Fetch user details from /api/profile/
+      const profileResponse = await axios.get('/api/profile/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const userId = profileResponse.data.id; // Extract user ID from profile
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('username', username);
+      localStorage.setItem('userId', userId); // Store the user ID
+      console.log("LoginForm: userId set to localStorage:", userId);
+      login(token, username);
+
       navigate('/chats', { replace: true });
 
     } catch (error) {
@@ -41,28 +53,28 @@ function LoginForm({ login }) {
           {error}
         </div>
       )}
-      
+
       <input
         type="text"
         placeholder="Username"
         value={username}
-        onChange={(e) => setUsername(e.target.value)} 
+        onChange={(e) => setUsername(e.target.value)}
         autoComplete="username"
         required
         className="w-full p-3 mb-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
       />
-      
+
       <input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        autoComplete="current-password" 
+        autoComplete="current-password"
         required
         className="w-full p-3 mb-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
       />
-      
-      <button 
+
+      <button
         type="submit"
         className="w-full bg-blue-500 text-white py-3 rounded hover:bg-blue-600 transition-colors"
       >

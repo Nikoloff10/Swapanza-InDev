@@ -45,7 +45,7 @@ const Profile = ({ logout, username }) => {
             />
           ) : (
             <img
-              src="https://res.cloudinary.com/dfxbvixpv/image/upload/v1738928319/unisex_default_profile_picture_zovdsw.jpg" // Replace with the actual path to your default image
+              src="https://res.cloudinary.com/dfxbvixpv/image/upload/v1738928319/unisex_default_profile_picture_zovdsw.jpg"
               alt="Default Profile"
               className="w-full h-full object-cover"
             />

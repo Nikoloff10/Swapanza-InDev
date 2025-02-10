@@ -1,26 +1,13 @@
-import os
-from django.http import FileResponse
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView
-
-from swapanzaBackend import settings
 from . import views
 
-def manifest(request):
-    manifest_path = os.path.join(settings.BASE_DIR, 'frontend', 'build', 'manifest.json')
-    return FileResponse(open(manifest_path, 'rb'), content_type='application/json')
-
 urlpatterns = [
-    path('manifest.json', manifest, name='manifest'),
-    path('users/', views.UserList.as_view()),
-    path('messages/', views.MessageList.as_view()),
-    path('messages/create/', views.MessageCreate.as_view()),
-    path('chats/', views.ChatList.as_view(), name='chat-list'),
-    path('chats/create/', views.ChatCreate.as_view(), name='chat-create'),
+    path('messages/<int:chat_id>/', views.MessageListCreateView.as_view(), name='message-list-create'),
+    path('chats/', views.ChatListCreateView.as_view(), name='chat-list-create'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('users/create/', views.UserCreate.as_view(), name='user-create'),
-    path('chats/<int:pk>/switch/', views.ChatSwitchView.as_view(), name='chat-switch'),
-    path('messages/create/', views.MessageCreate.as_view(), name='message-create'),
     path('profile/', views.profile, name='profile'),
+    path('users/', views.UserListView.as_view(), name='user-list'),
     path('', views.index, name='index'),
 ]

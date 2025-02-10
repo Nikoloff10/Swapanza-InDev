@@ -1,199 +1,185 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import Chat from './Chat';
-import { Cloudinary } from "@cloudinary/url-gen";
-import { AdvancedImage } from '@cloudinary/react';
-import { fill } from "@cloudinary/url-gen/actions/resize";
+import ChatModal from './ChatModal';
 
 function ChatList({ logout, username }) {
   const navigate = useNavigate();
   const [chats, setChats] = useState([]);
-  const [selectedChat, setSelectedChat] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const token = localStorage.getItem('token');
-  const [defaultProfileImage, setDefaultProfileImage] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalChatId, setModalChatId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null); // Initialize to null
+  const [isLoading, setIsLoading] = useState(true);
+
+
+
+  console.log("ChatList: currentUserId:", currentUserId);
 
   useEffect(() => {
-    console.log('Cloudinary useEffect called');
-    try {
-      const cld = new Cloudinary({
-        cloud: {
-          cloudName: 'dfxbvixpv'
-        }
-      });
-
-      const image = cld.image('unisex_default_profile_picture_zovdsw');
-      image.resize(fill().width(100).height(100));
-      setDefaultProfileImage(image);
-      console.log('defaultProfileImage set:', image);
-    } catch (error) {
-      console.error('Error initializing Cloudinary:', error);
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      setCurrentUserId(userId);
+      console.log("ChatList: currentUserId loaded from localStorage:", userId);
+      setIsLoading(false);
+    } else {
+      setIsLoading(false); // Handle the case where userId is not found
     }
   }, []);
 
   const fetchChats = useCallback(async () => {
-    try {
-      const response = await axios.get('/api/chats/', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const sortedChats = response.data.sort(
-        (a, b) => new Date(a.created_at) - new Date(b.created_at)
-      );
-      setChats(sortedChats);
-    } catch (error) {
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
-        navigate('/login', { replace: true });
+    if (currentUserId) {
+      try {
+        const response = await axios.get('/api/chats/', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        setChats(response.data);
+      } catch (error) {
+        console.error('Error fetching chats:', error);
       }
-      console.error('Error fetching chats:', error);
     }
-  }, [token, navigate]);
+  }, [token, currentUserId]);
 
   useEffect(() => {
     if (!token) {
       navigate('/login', { replace: true });
-    } else {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else if (currentUserId) {
       fetchChats();
     }
-  }, [token, navigate, fetchChats]);
+  }, [token, navigate, fetchChats, currentUserId]);
 
   const searchUsers = useCallback(async (query) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    try {
-      const response = await axios.get(`/api/users/?search=${query}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const filteredResults = response.data.filter(user =>
-        user.username !== username &&
-        !chats.some(chat =>
-          chat.participants.some(p => p.username === user.username)
-        )
-      );
-      setSearchResults(filteredResults);
-    } catch (error) {
-      console.error('Error searching users:', error);
-    }
-  }, [token, username, chats]);
-
-  const handleCreateChat = async (userId) => {
-    try {
-      const response = await axios.post('/api/chats/create/', {
-        participants: [userId]
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.data) {
-        setChats(prevChats => [...prevChats, response.data]);
-        setSelectedChat(response.data);
+    if (currentUserId) {
+      if (!query.trim()) {
         setSearchResults([]);
-        setSearchQuery('');
+        return;
       }
-    } catch (error) {
-      if (error.response?.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
-        navigate('/login', { replace: true });
+      console.log("Searching for:", query); // Add this line
+      try {
+        const response = await axios.get(`/api/users/?search=${query}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const filteredResults = response.data.filter(user =>
+          user.id !== currentUserId &&
+          !chats.some(chat =>
+            chat.participants && Array.isArray(chat.participants) && chat.participants.some(p => p.id === user.id)
+          )
+        );
+        setSearchResults(filteredResults);
+      } catch (error) {
+        console.error('Error searching users:', error);
+      }
+    }
+  }, [token, chats, currentUserId]);
+
+  const createChat = async (otherUserId) => {
+    if (currentUserId) {
+      console.log("Creating chat with otherUserId:", otherUserId);
+      console.log("Creating chat with currentUserId:", currentUserId);
+
+      if (otherUserId === currentUserId) {
+        console.log("Cannot create chat with yourself.");
+        return; // Prevent creating chat with yourself
+      }
+
+      try {
+        const response = await axios.post('/api/chats/', {
+          participants: [otherUserId, currentUserId]
+        }, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        fetchChats();
+        console.log("New chat ID:", response.data.id);
+        openModal(response.data.id);
+      } catch (error) {
+        console.error("Error creating chat:", error);
       }
     }
   };
 
-  // Debounce the searchUsers function
-  const debouncedSearchUsers = useCallback((query) => {
-    searchUsers(query);
-  }, [searchUsers]);
+  const openModal = (chatId) => {
+    setModalChatId(chatId);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setModalChatId(null);
+  };
 
   useEffect(() => {
-    if (searchQuery) {
+    if (currentUserId) {
       const timerId = setTimeout(() => {
-        debouncedSearchUsers(searchQuery);
-      }, 300); // 300ms delay
-
-      return () => {
-        clearTimeout(timerId); // Clear the timeout if searchQuery changes within the delay
-      };
-    } else {
-      setSearchResults([]); // Clear results if search query is empty
+        searchUsers(searchQuery);
+      }, 300);
+      return () => clearTimeout(timerId);
     }
-  }, [searchQuery, debouncedSearchUsers]);
+  }, [searchQuery, searchUsers, currentUserId]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Profile Button */}
-      <div className="absolute top-4 right-4">
-        <button
-          onClick={() => navigate('/profile')}
-          className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors overflow-hidden"
-        >
-          {defaultProfileImage && <AdvancedImage cldImg={defaultProfileImage} alt="Profile" className="w-full h-full object-cover" />}
-        </button>
-      </div>
 
-      {/* Chat List Sidebar */}
+    <div className="flex h-screen bg-gray-100">
       <div className="w-1/4 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-semibold">Your Chats</h2>
+          <h1> This is user with id {currentUserId} </h1>
+          <div
+            onClick={() => navigate('/profile')}
+            className="w-10 h-10 rounded-full bg-gray-300 hover:bg-gray-400 cursor-pointer overflow-hidden"
+          >
+            <img
+              src={
+                localStorage.getItem('profile_image_url') ||
+                "https://res.cloudinary.com/dfxbvixpv/image/upload/v1738928319/unisex_default_profile_picture_zovdsw.jpg"
+              }
+              alt="Profile"
+              className="w-full h-full object-cover"
+            />
+          </div>
         </div>
         <div className="p-4 border-b">
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-            }}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search for users..."
             className="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500"
           />
         </div>
         <div className="overflow-y-auto flex-1">
-          {chats.map((chat) => {
-            const friend = chat.participants.find(p => p.username !== username);
-            return (
-              <div
-                key={chat.id}
-                onClick={() => setSelectedChat(chat)}
-                className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${selectedChat?.id === chat.id ? 'bg-blue-50' : ''
-                  }`}
-              >
-                <div className="font-medium">{friend?.username}</div>
-                <div className="text-sm text-gray-500">
-                  {new Date(chat.created_at).toLocaleDateString()}
-                </div>
-              </div>
-            );
-          })}
+          {chats.map((chat) => (
+            <div
+              key={chat.id}
+              onClick={chat.participants && Array.isArray(chat.participants) ? () => openModal(chat.id) : null}
+              className={`p-4 border-b cursor-pointer hover:bg-gray-50`}
+            >
+              {chat.participants && Array.isArray(chat.participants) ? (
+                chat.participants.map(participant => {
+                  if (participant !== currentUserId) {
+                    return <div key={participant}>User {participant}</div>
+                  }
+                  return null;
+                })
+              ) : (
+                <div>No participants</div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1">
-        {selectedChat ? (
-          <Chat chatId={selectedChat.id} />
-        ) : (
-          <div className="h-full flex items-center justify-center text-gray-500">
-            <div className="text-center">
-              <h3 className="text-xl font-medium mb-2">Welcome to Swapanza Chat</h3>
-              <p>Select a chat from the left or search for new friends</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Search Results */}
       {searchResults.length > 0 && (
         <div className="absolute top-20 left-1/4 w-1/4 bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden">
           <div className="p-4 border-b">
@@ -204,13 +190,17 @@ function ChatList({ logout, username }) {
               <div
                 key={user.id}
                 className="p-4 border-b hover:bg-gray-50 cursor-pointer"
-                onClick={() => handleCreateChat(user.id)}
+                onClick={() => createChat(user.id)}
               >
                 {user.username}
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {isModalOpen && (
+        <ChatModal chatId={modalChatId} onClose={closeModal} />
       )}
     </div>
   );

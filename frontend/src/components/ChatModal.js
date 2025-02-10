@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import Chat from './Chat';
 
 const ChatModal = ({ chatId, onClose, onMessageSend }) => {
@@ -24,27 +23,27 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
     return cookieValue;
   }
 
-  // Set axios defaults.
+  // Set fetch credentials and CSRF header on mount.
   useEffect(() => {
-    const csrfToken = getCookie('csrftoken');
-    if (csrfToken) {
-      axios.defaults.headers.common['X-CSRFToken'] = csrfToken;
-    }
-    axios.defaults.withCredentials = true;
+    // (No axios defaults to set since we're using fetch.)
   }, []);
 
   // Fetch chat and its messages.
   const fetchChat = useCallback(async () => {
     if (!token || !chatId) return;
     try {
-      const response = await axios.get(`/api/chats/${chatId}/`, {
+      const res = await fetch(`/api/chats/${chatId}/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        withCredentials: true
+        credentials: 'include'
       });
-      const fetchedChat = response.data;
+      if (!res.ok) {
+        console.error('Error fetching chat:', await res.text());
+        return;
+      }
+      const fetchedChat = await res.json();
       if (
         !fetchedChat.participants ||
         !fetchedChat.participants.find(
@@ -57,7 +56,7 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
       setChat(fetchedChat);
       setMessages(fetchedChat.messages || []);
     } catch (error) {
-      console.error('Error fetching chat:', error.response || error);
+      console.error('Error fetching chat:', error);
     }
   }, [chatId, token, currentUserId]);
 
@@ -65,29 +64,34 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
     fetchChat();
   }, [fetchChat]);
 
+  // Change: Use fetch instead of axios and update messages optimistically.
   const sendMessage = async (content) => {
     if (!content.trim() || !token || !chatId) return;
     const idToUse = chat ? Number(chat.id) : Number(chatId);
     try {
-      await axios.post(
-        `/api/chats/${idToUse}/messages/`,
-        { content },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-          },
-          withCredentials: true
-        }
-      );
-      // After sending, re-fetch chat data so new message is included.
-      await fetchChat();
+      const res = await fetch(`/api/chats/${idToUse}/messages/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        credentials: 'include',
+        body: JSON.stringify({ content })
+      });
+      if (!res.ok) {
+        // Log response error details if available.
+        const errorData = await res.text();
+        throw new Error(`Server error: ${res.status} ${res.statusText}\n${errorData}`);
+      }
+      const newMessage = await res.json();
+      // Append the new message optimistically.
+      setMessages((prevMessages) => [...prevMessages, newMessage]);
       if (onMessageSend) {
         onMessageSend();
       }
     } catch (error) {
-      console.error('Error sending message:', error.response || error);
+      console.error('Error sending message:', error);
     }
   };
 

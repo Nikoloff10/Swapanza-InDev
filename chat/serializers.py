@@ -21,8 +21,8 @@ class UserSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ['id', 'content', 'chat', 'sender', 'timestamp']
-        read_only_fields = ['chat', 'sender', 'timestamp']
+        fields = ['id', 'content', 'sender']
+        read_only_fields = ['id', 'sender']
 
 class ChatSerializer(serializers.ModelSerializer):
     participants = UserSerializer(many=True, read_only=True)

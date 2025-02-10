@@ -19,25 +19,23 @@ class UserSerializer(serializers.ModelSerializer):
         return instance
 
 class MessageSerializer(serializers.ModelSerializer):
-    sender_username = serializers.CharField(source='sender.username', read_only=True)
-
     class Meta:
         model = Message
-        fields = ['id', 'chat', 'sender', 'sender_username', 'content', 'created_at']
-        read_only_fields = ['sender', 'created_at']
+        fields = ['id', 'content', 'chat', 'sender', 'timestamp']
+        read_only_fields = ['chat', 'sender', 'timestamp']
 
 class ChatSerializer(serializers.ModelSerializer):
-    participants = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
-        many=True,
-        write_only=True,
-        required=True
-    )
+    participants = UserSerializer(many=True, read_only=True)
+
+    participants_usernames = serializers.SerializerMethodField()
 
     class Meta:
         model = Chat
-        fields = ['id', 'participants', 'created_at']
+        fields = ['id', 'participants', 'participants_usernames', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+    def get_participants_usernames(self, obj):
+        return [user.username for user in obj.participants.all()]
 
     def create(self, validated_data):
         participants = validated_data.pop('participants', [])

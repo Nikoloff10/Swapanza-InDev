@@ -1,72 +1,65 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import React, { useState, useRef, useEffect } from 'react';
 
-const Chat = ({ chatId }) => {
-  const [messages, setMessages] = useState([]);
+function Chat({ chat, currentUserId, messages = [], sendMessage }) {
   const [newMessage, setNewMessage] = useState('');
-  const token = localStorage.getItem('token');
-  const currentUserId = localStorage.getItem('userId');
+  const messagesEndRef = useRef(null);
 
-  const fetchMessages = useCallback(async () => {
-    try {
-      const response = await axios.get(`/api/messages/${chatId}/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      setMessages(response.data);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
-  }, [chatId, token]);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
-    if (chatId) {
-      fetchMessages();
-      const interval = setInterval(fetchMessages, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [chatId, fetchMessages]);
+    scrollToBottom();
+  }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
+  if (!chat) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="p-4 border-b">
+          <h3 className="text-lg font-semibold">Loading chat...</h3>
+        </div>
+      </div>
+    );
+  }
 
-    try {
-      await axios.post(`/api/messages/${chatId}/`, {
-        content: newMessage,
-        chat: chatId
-      }, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+  const otherParticipants = chat.participants?.filter(
+    (participant) => Number(participant.id) !== Number(currentUserId)
+  ) || [];
+
+  const otherParticipant = otherParticipants[0] || { username: 'Unknown' };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (newMessage.trim()) {
+      sendMessage(newMessage);
       setNewMessage('');
-      fetchMessages();
-    } catch (error) {
-      console.error('Error sending message:', error);
     }
   };
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b bg-white">
-        <h3 className="text-lg font-semibold">Chat</h3>
+      <div className="p-4 border-b">
+        <h3 className="text-lg font-semibold">Chat with {otherParticipant.username}</h3>
       </div>
-
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
         {messages.map((msg, index) => (
           <div
             key={index}
-            className={`mb-4 flex ${msg.sender === currentUserId ? 'justify-end' : 'justify-start'}`}
+            className={`mb-4 flex ${msg.sender === Number(currentUserId) ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.sender === currentUserId
-              ? 'bg-blue-500 text-white'
-              : 'bg-white border border-gray-200'
-              }`}>
+            <div
+              className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.sender === Number(currentUserId)
+                  ? 'bg-red-200 text-white'
+                  : 'bg-white border border-gray-200'
+                }`}
+            >
+              {msg.content}
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
-
-      <div className="p-4 bg-white border-t">
+      <form onSubmit={handleSubmit} className="p-4 bg-white border-t">
         <div className="flex gap-2">
           <input
             type="text"
@@ -74,18 +67,17 @@ const Chat = ({ chatId }) => {
             onChange={(e) => setNewMessage(e.target.value)}
             className="flex-1 p-2 border rounded"
             placeholder="Type a message..."
-            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
           />
           <button
-            onClick={handleSendMessage}
+            type="submit"
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Send
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
-};
+}
 
 export default Chat;

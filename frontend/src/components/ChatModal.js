@@ -47,7 +47,6 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
         return;
       }
       setChat(fetchedChat);
-      // Ensure messages are sorted by creation time
       const sortedMessages = (fetchedChat.messages || []).sort(
         (a, b) => new Date(a.created_at) - new Date(b.created_at)
       );
@@ -57,8 +56,17 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
     }
   }, [chatId, token, currentUserId]);
 
+  // Set up polling for new messages
   useEffect(() => {
-    fetchChat();
+    fetchChat(); // Initial fetch
+
+    // Poll every 2 seconds
+    const interval = setInterval(() => {
+      fetchChat();
+    }, 2000);
+
+    // Cleanup on unmount
+    return () => clearInterval(interval);
   }, [fetchChat]);
 
   const sendMessage = async (content) => {
@@ -79,11 +87,16 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
         throw new Error(`Server error: ${res.status} ${res.statusText}\n${errorData}`);
       }
       const updatedChat = await res.json();
+
+      // Update local state immediately
       setChat(updatedChat);
-      setMessages(updatedChat.messages || []);
-      if (onMessageSend) {
-        onMessageSend();
-      }
+      const sortedMessages = (updatedChat.messages || []).sort(
+        (a, b) => new Date(a.created_at) - new Date(b.created_at)
+      );
+      setMessages(sortedMessages);
+
+      // Trigger immediate fetch to ensure sync
+      fetchChat();
     } catch (error) {
       console.error('Error sending message:', error);
     }

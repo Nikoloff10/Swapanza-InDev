@@ -265,9 +265,11 @@ function ChatList({ logout, username }) {
           chatId={modalChatId}
           onClose={() => {
             setIsModalOpen(false);
+            // Optionally fetch chats to ensure sync
             fetchChats();
           }}
-          onMessageSend={fetchChats}
+        // Remove onMessageSend since we're handling updates in ChatModal
+        // onMessageSend={fetchChats} 
         />
       )}
     </div>

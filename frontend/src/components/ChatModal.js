@@ -1,34 +1,27 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Chat from './Chat';
+
+const getCookie = (name) => {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+};
 
 const ChatModal = ({ chatId, onClose, onMessageSend }) => {
   const token = localStorage.getItem('token');
+  const currentUserId = Number(localStorage.getItem('userId') || 0);
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
-  const currentUserId = Number(localStorage.getItem('userId'));
 
-  // Retrieve CSRF token from cookies.
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let cookie of cookies) {
-        cookie = cookie.trim();
-        if (cookie.startsWith(name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
-  }
-
-  // Set fetch credentials and CSRF header on mount.
-  useEffect(() => {
-    // (No axios defaults to set since we're using fetch.)
-  }, []);
-
-  // Fetch chat and its messages.
   const fetchChat = useCallback(async () => {
     if (!token || !chatId) return;
     try {
@@ -54,7 +47,11 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
         return;
       }
       setChat(fetchedChat);
-      setMessages(fetchedChat.messages || []);
+      // Ensure messages are sorted by creation time
+      const sortedMessages = (fetchedChat.messages || []).sort(
+        (a, b) => new Date(a.created_at) - new Date(b.created_at)
+      );
+      setMessages(sortedMessages);
     } catch (error) {
       console.error('Error fetching chat:', error);
     }
@@ -64,29 +61,26 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
     fetchChat();
   }, [fetchChat]);
 
-  // Change: Use fetch instead of axios and update messages optimistically.
   const sendMessage = async (content) => {
     if (!content.trim() || !token || !chatId) return;
-    const idToUse = chat ? Number(chat.id) : Number(chatId);
     try {
-      const res = await fetch(`/api/chats/${idToUse}/messages/`, {
-        method: 'POST',
+      const res = await fetch(`/api/chats/${chatId}/`, {
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'X-CSRFToken': getCookie('csrftoken')
         },
         credentials: 'include',
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ content: content })
       });
       if (!res.ok) {
-        // Log response error details if available.
         const errorData = await res.text();
         throw new Error(`Server error: ${res.status} ${res.statusText}\n${errorData}`);
       }
-      const newMessage = await res.json();
-      // Append the new message optimistically.
-      setMessages((prevMessages) => [...prevMessages, newMessage]);
+      const updatedChat = await res.json();
+      setChat(updatedChat);
+      setMessages(updatedChat.messages || []);
       if (onMessageSend) {
         onMessageSend();
       }

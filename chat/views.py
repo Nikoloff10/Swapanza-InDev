@@ -12,6 +12,27 @@ from rest_framework import filters
 
 User = get_user_model()
 
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def chat_messages(request, chat_id):
+    chat = get_object_or_404(Chat, id=chat_id)
+    if request.user not in chat.participants.all():
+        return Response({"error": "Not a participant of this chat."}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        messages = chat.messages.all()  # Make sure your Message model sets related_name="messages"
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = MessageSerializer(data=request.data)
+        if serializer.is_valid():
+            # Pass the chat and sender explicitly here.
+            message = serializer.save(chat=chat, sender=request.user)
+            return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class UserCreate(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -41,10 +62,39 @@ class ChatListCreateView(generics.ListCreateAPIView):
         participants.append(self.request.user.id)
         serializer.save(participants=participants)
 
-class ChatDetailView(generics.RetrieveAPIView):
-    serializer_class = ChatSerializer
-    permission_classes = [IsAuthenticated]
+
+class ChatDetailView(generics.RetrieveUpdateAPIView):
     queryset = Chat.objects.all()
+    serializer_class = ChatSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Add order_by to ensure consistent message ordering
+        return Chat.objects.prefetch_related(
+            'messages', 
+            'participants'
+        ).all()
+
+    def get_object(self):
+        obj = super().get_object()
+        # Force evaluation of messages
+        obj.messages.all()
+        return obj
+
+    def update(self, request, *args, **kwargs):
+        chat = self.get_object()
+        
+        # Create a new message
+        Message.objects.create(
+            chat=chat,
+            sender=request.user,
+            content=request.data.get('content')
+        )
+        
+        # Return updated chat with all messages
+        chat.refresh_from_db()  # Refresh to get the newly created message
+        serializer = self.get_serializer(chat)
+        return Response(serializer.data)
 
 logger = logging.getLogger(__name__)
 

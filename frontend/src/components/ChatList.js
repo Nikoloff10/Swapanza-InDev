@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import ChatModal from './ChatModal';
 
@@ -11,13 +11,17 @@ function ChatList({ logout, username }) {
   const [modalChatId, setModalChatId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Get IDs of closed chats stored in localStorage.
+  // Get IDs of closed chats from localStorage
   const getClosedChatIds = () =>
-    JSON.parse(localStorage.getItem('closedChats') || '[]').map((id) =>
-      id.toString()
-    );
+    JSON.parse(localStorage.getItem('closedChats') || '[]').map((id) => id.toString());
 
-  // Update closed chats list in localStorage.
+  // Remove chat id from closed chats when opening it
+  const removeClosedChatId = (chatId) => {
+    const closed = getClosedChatIds().filter((id) => id !== chatId.toString());
+    localStorage.setItem('closedChats', JSON.stringify(closed));
+  };
+
+  // Add chat id to localStorage for closed chats
   const addClosedChatId = (chatId) => {
     const closed = getClosedChatIds();
     if (!closed.includes(chatId.toString())) {
@@ -26,7 +30,7 @@ function ChatList({ logout, username }) {
     }
   };
 
-  // Fetch chats and filter out closed ones.
+  // Fetch chats from the backend and filter out closed chats.
   const fetchChats = useCallback(async () => {
     if (!currentUserId || !token) return;
     try {
@@ -34,10 +38,18 @@ function ChatList({ logout, username }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const closedIds = getClosedChatIds();
+      // Filter out chats whose id is among the closed IDs.
       const activeChats = response.data.filter(
         (chat) => !closedIds.includes(chat.id.toString())
       );
-      setChats(activeChats);
+      // Also ensure that there are no duplicate chats by id.
+      const unique = activeChats.reduce((acc, curr) => {
+        if (!acc.find((chat) => Number(chat.id) === Number(curr.id))) {
+          acc.push(curr);
+        }
+        return acc;
+      }, []);
+      setChats(unique);
     } catch (error) {
       console.error('Error fetching chats:', error.response || error);
     }
@@ -47,8 +59,9 @@ function ChatList({ logout, username }) {
     fetchChats();
   }, [fetchChats]);
 
-  // Open chat modal.
+  // Open chat modal; if the chat was marked as closed, remove it from closedChats.
   const openModal = (chatId) => {
+    removeClosedChatId(chatId);
     setModalChatId(chatId);
     setIsModalOpen(true);
   };
@@ -61,7 +74,7 @@ function ChatList({ logout, username }) {
     );
   };
 
-  // Close all recent chats.
+  // Close all chats: mark all as closed and clear the chats list.
   const closeAllChats = () => {
     chats.forEach((chat) => addClosedChatId(chat.id));
     setChats([]);
@@ -83,8 +96,9 @@ function ChatList({ logout, username }) {
         const inChatIds = new Set();
         chats.forEach((chat) => {
           chat.participants.forEach((p) => {
-            if (Number(p.id) === Number(currentUserId)) return;
-            inChatIds.add(Number(p.id));
+            if (Number(p.id) !== Number(currentUserId)) {
+              inChatIds.add(Number(p.id));
+            }
           });
         });
         const filtered = response.data.filter(
@@ -100,41 +114,79 @@ function ChatList({ logout, username }) {
     [currentUserId, token, chats]
   );
 
-  // Update search results whenever the chats or the search query is changed.
+  const searchTimeout = useRef(null);
+
+  useEffect(() => {
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    searchTimeout.current = setTimeout(() => {
+      if (searchQuery.trim()) {
+        searchUsers(searchQuery);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(searchTimeout.current);
+  }, [searchQuery, chats, searchUsers]);
+
   useEffect(() => {
     if (searchQuery.trim()) {
       searchUsers(searchQuery);
     }
   }, [chats, searchQuery, searchUsers]);
 
-  // Create new chat.
+  // Create new chat. If it already exists, reopen it
   const createChat = async (otherUserId) => {
     try {
-      // Check if a chat already exists.
-      const existingChat = chats.find(
+      // First try to get the chat from the backend directly
+      const response = await axios.get('/api/chats/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Look for existing chat in ALL chats, not just active ones
+      const existingChat = response.data.find(
         (chat) =>
           chat.participants.some((p) => Number(p.id) === Number(otherUserId)) &&
           chat.participants.some((p) => Number(p.id) === Number(currentUserId))
       );
+
       if (existingChat) {
+        // Remove from closed chats if necessary
+        removeClosedChatId(existingChat.id);
+        // Fetch fresh data for existing chat
+        const chatResponse = await axios.get(`/api/chats/${existingChat.id}/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        // Update chat in state with fresh data
+        setChats(prevChats => {
+          const chatExists = prevChats.some(c => c.id === existingChat.id);
+          if (chatExists) {
+            return prevChats.map(c =>
+              c.id === existingChat.id ? chatResponse.data : c
+            );
+          } else {
+            // Add to chats if it wasn't there
+            return [...prevChats, chatResponse.data];
+          }
+        });
         openModal(existingChat.id);
-        fetchChats();
         return;
       }
-    } catch (error) {
-      console.error('Error checking for existing chat:', error.response || error);
-    }
-    try {
-      // Create a new chat.
+
+      // Create new chat if none exists
       const createResponse = await axios.post(
         '/api/chats/',
         { participants: [otherUserId, currentUserId] },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      fetchChats();
-      openModal(createResponse.data.id);
+
+      const newChat = createResponse.data;
+      setChats(prevChats => [...prevChats, newChat]);
+      removeClosedChatId(newChat.id);
+      openModal(newChat.id);
     } catch (error) {
-      console.error('Error creating chat:', error.response || error);
+      console.error('Error with chat:', error.response || error);
     }
   };
 
@@ -170,7 +222,6 @@ function ChatList({ logout, username }) {
         )}
       </div>
 
-      {/* Button to close all recent chats at once */}
       <div className="mb-4">
         <button
           onClick={closeAllChats}

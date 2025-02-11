@@ -19,7 +19,7 @@ class Chat(models.Model):
         return f"Chat {self.id} between {self.participants.count()} users"
 
 class Message(models.Model):
-    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name='messages', null=True)
+    chat = models.ForeignKey(Chat, related_name='messages', on_delete=models.CASCADE)
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)

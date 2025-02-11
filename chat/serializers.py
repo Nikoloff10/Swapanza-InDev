@@ -7,7 +7,7 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'profile_image_url')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'password', 'profile_image_url')
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
@@ -24,14 +24,20 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'content', 'sender']
         read_only_fields = ['id', 'sender']
 
+    def create(self, validated_data):
+        # Pop extra kwargs provided via serializer.save(chat=..., sender=...)
+        chat = validated_data.pop('chat', None)
+        sender = validated_data.pop('sender', None)
+        return Message.objects.create(chat=chat, sender=sender, **validated_data)
+
 class ChatSerializer(serializers.ModelSerializer):
     participants = UserSerializer(many=True, read_only=True)
-
+    messages = MessageSerializer(many=True, read_only=True)
     participants_usernames = serializers.SerializerMethodField()
 
     class Meta:
         model = Chat
-        fields = ['id', 'participants', 'participants_usernames', 'created_at']
+        fields = ['id', 'participants', 'participants_usernames', 'messages', 'created_at']
         read_only_fields = ['id', 'created_at']
 
     def get_participants_usernames(self, obj):

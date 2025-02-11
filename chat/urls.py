@@ -3,9 +3,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from . import views
 
 urlpatterns = [
-    path('messages/<int:chat_id>/', views.MessageListCreateView.as_view(), name='message-list-create'),
     path('chats/<int:pk>/', views.ChatDetailView.as_view()),
-     path('chats/<int:chat_id>/messages/', views.MessageListCreateView.as_view(), name='message-list-create'),
     path('chats/', views.ChatListCreateView.as_view(), name='chat-list-create'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('users/create/', views.UserCreate.as_view(), name='user-create'),

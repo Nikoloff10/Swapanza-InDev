@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-sh%pzqu4(zfuax&i(uglk&nhd5d#&4msx!+&l=_s$!%73*_s(l
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -36,11 +36,15 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'daphne',
     'django.contrib.staticfiles',
-    'rest_framework',
-    'chat',
     'channels',
+    'chat',
     'corsheaders',
+    'rest_framework',
+    
+    
+    
 ]
 
 MIDDLEWARE = [
@@ -136,6 +140,15 @@ AUTH_USER_MODEL = 'chat.User'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 
 function Chat({ chat, currentUserId, messages = [], sendMessage }) {
   const [newMessage, setNewMessage] = useState('');
@@ -37,6 +37,27 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
     }
   };
 
+  // Memoize the message rendering
+  const MemoizedMessage = memo(({ msg, isCurrentUser, chat, index }) => {
+    const messageStyle = isCurrentUser
+      ? 'bg-red-200 text-white'
+      : 'bg-yellow-200 text-black';
+    return (
+      <div className={`max-w-[70%] rounded-lg px-4 py-2 ${messageStyle}`}>
+        {msg.content}
+        {((index + 1) % 4 === 0) && (
+          <div className="mt-1 text-xs font-semibold">
+            {isCurrentUser
+              ? 'You'
+              : chat.participants.find(
+                (p) => Number(p.id) === Number(msg.sender)
+              )?.username}
+          </div>
+        )}
+      </div>
+    );
+  });
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
@@ -48,26 +69,17 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
         {messages.map((msg, index) => {
           const isCurrentUser = Number(msg.sender) === Number(currentUserId);
-          const messageStyle = isCurrentUser
-            ? 'bg-red-200 text-white'
-            : 'bg-yellow-200 text-black';
           return (
             <div
               key={index}
               className={`mb-4 flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`max-w-[70%] rounded-lg px-4 py-2 ${messageStyle}`}>
-                {msg.content}
-                {((index + 1) % 4 === 0) && (
-                  <div className="mt-1 text-xs font-semibold">
-                    {isCurrentUser
-                      ? 'You'
-                      : chat.participants.find(
-                        (p) => Number(p.id) === Number(msg.sender)
-                      )?.username}
-                  </div>
-                )}
-              </div>
+              <MemoizedMessage
+                msg={msg}
+                isCurrentUser={isCurrentUser}
+                chat={chat}
+                index={index}
+              />
             </div>
           );
         })}

@@ -1,27 +1,14 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Chat from './Chat';
-
-const getCookie = (name) => {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-      cookie = cookie.trim();
-      if (cookie.startsWith(name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-};
 
 const ChatModal = ({ chatId, onClose, onMessageSend }) => {
   const token = localStorage.getItem('token');
   const currentUserId = Number(localStorage.getItem('userId') || 0);
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
+  const ws = useRef(null);
 
+  // Initial fetch to load chat details
   const fetchChat = useCallback(async () => {
     if (!token || !chatId) return;
     try {
@@ -56,50 +43,57 @@ const ChatModal = ({ chatId, onClose, onMessageSend }) => {
     }
   }, [chatId, token, currentUserId]);
 
-  // Set up polling for new messages
+  // Set up WebSocket for real-time updates
   useEffect(() => {
-    fetchChat(); // Initial fetch
+    if (!chatId || !token) return;
+    ws.current = new WebSocket(`ws://localhost:8000/ws/chat/${chatId}/?token=${token}`);
 
-    // Poll every 2 seconds
-    const interval = setInterval(() => {
-      fetchChat();
-    }, 2000);
+    ws.current.onopen = () => {
+      console.log('WebSocket connected');
+    };
 
-    // Cleanup on unmount
-    return () => clearInterval(interval);
+    ws.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.chat) {
+        setChat(data.chat);
+        const sortedMessages = (data.chat.messages || []).sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        );
+        setMessages(sortedMessages);
+      } else if (data.message) {
+        setMessages((prevMessages) => {
+          const newMessages = [...prevMessages, data.message];
+          return newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        });
+      }
+    };
+
+    ws.current.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    return () => {
+      if (ws.current) {
+        ws.current.close();
+      }
+    };
+  }, [chatId, token]);
+
+  useEffect(() => {
+    fetchChat();
   }, [fetchChat]);
 
   const sendMessage = async (content) => {
-    if (!content.trim() || !token || !chatId) return;
-    try {
-      const res = await fetch(`/api/chats/${chatId}/`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCookie('csrftoken')
-        },
-        credentials: 'include',
-        body: JSON.stringify({ content: content })
-      });
-      if (!res.ok) {
-        const errorData = await res.text();
-        throw new Error(`Server error: ${res.status} ${res.statusText}\n${errorData}`);
-      }
-      const updatedChat = await res.json();
-
-      // Update local state immediately
-      setChat(updatedChat);
-      const sortedMessages = (updatedChat.messages || []).sort(
-        (a, b) => new Date(a.created_at) - new Date(b.created_at)
-      );
-      setMessages(sortedMessages);
-
-      // Trigger immediate fetch to ensure sync
-      fetchChat();
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
+    if (!content.trim() || !ws.current || ws.current.readyState !== WebSocket.OPEN) return;
+    const message = {
+      content,
+      sender: currentUserId,
+    };
+    ws.current.send(JSON.stringify(message));
   };
 
   return (

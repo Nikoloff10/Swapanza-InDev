@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404, render
-from rest_framework import filters
+from rest_framework import filters, pagination
 
 User = get_user_model()
 
@@ -64,14 +64,18 @@ class ChatListCreateView(generics.ListCreateAPIView):
 
 
 class ChatDetailView(generics.RetrieveUpdateAPIView):
-    queryset = Chat.objects.all()
+    queryset = Chat.objects.all().prefetch_related(
+        'messages__sender',  
+        'participants'
+    )
     serializer_class = ChatSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = pagination.PageNumberPagination
 
     def get_queryset(self):
         # Add order_by to ensure consistent message ordering
         return Chat.objects.prefetch_related(
-            'messages', 
+            'messages__sender', 
             'participants'
         ).all()
 

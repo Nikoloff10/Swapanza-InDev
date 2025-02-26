@@ -20,14 +20,14 @@ def chat_messages(request, chat_id):
         return Response({"error": "Not a participant of this chat."}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
-        messages = chat.messages.all()  # Make sure your Message model sets related_name="messages"
+        messages = chat.messages.all()  
         serializer = MessageSerializer(messages, many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
         serializer = MessageSerializer(data=request.data)
         if serializer.is_valid():
-            # Pass the chat and sender explicitly here.
+            
             message = serializer.save(chat=chat, sender=request.user)
             return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
         else:
@@ -62,6 +62,28 @@ class ChatListCreateView(generics.ListCreateAPIView):
         participants.append(self.request.user.id)
         serializer.save(participants=participants)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def unread_message_counts(request):
+    """Return counts of unread messages for each chat the user is part of."""
+    user = request.user
+    chats = Chat.objects.filter(participants=user)
+    
+    
+    unread_counts = {}
+    for chat in chats:
+        
+        count = Message.objects.filter(
+            chat=chat,
+            seen=False
+        ).exclude(
+            sender=user
+        ).count()
+        
+        if count > 0:
+            unread_counts[chat.id] = count
+            
+    return Response(unread_counts)
 
 class ChatDetailView(generics.RetrieveUpdateAPIView):
     queryset = Chat.objects.all().prefetch_related(
@@ -73,7 +95,7 @@ class ChatDetailView(generics.RetrieveUpdateAPIView):
     pagination_class = pagination.PageNumberPagination
 
     def get_queryset(self):
-        # Add order_by to ensure consistent message ordering
+        
         return Chat.objects.prefetch_related(
             'messages__sender', 
             'participants'
@@ -81,22 +103,22 @@ class ChatDetailView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         obj = super().get_object()
-        # Force evaluation of messages
+        
         obj.messages.all()
         return obj
 
     def update(self, request, *args, **kwargs):
         chat = self.get_object()
         
-        # Create a new message
+        
         Message.objects.create(
             chat=chat,
             sender=request.user,
             content=request.data.get('content')
         )
         
-        # Return updated chat with all messages
-        chat.refresh_from_db()  # Refresh to get the newly created message
+        
+        chat.refresh_from_db()  
         serializer = self.get_serializer(chat)
         return Response(serializer.data)
 

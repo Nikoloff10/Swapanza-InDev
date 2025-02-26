@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import ChatModal from './ChatModal';
+import { FaBell } from 'react-icons/fa'; // Import bell icon
 
 function ChatList({ logout, username }) {
   const token = localStorage.getItem('token');
@@ -10,6 +11,8 @@ function ChatList({ logout, username }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [modalChatId, setModalChatId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState({});
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Get IDs of closed chats from localStorage
   const getClosedChatIds = () =>
@@ -50,14 +53,36 @@ function ChatList({ logout, username }) {
         return acc;
       }, []);
       setChats(unique);
+
+      // Fetch unread message counts for each chat
+      fetchUnreadCounts();
     } catch (error) {
       console.error('Error fetching chats:', error.response || error);
     }
   }, [currentUserId, token]);
 
+  // Fetch unread message counts
+  const fetchUnreadCounts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get('/api/unread-counts/', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setUnreadCounts(response.data);
+    } catch (error) {
+      console.error('Error fetching unread counts:', error.response || error);
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchChats();
-  }, [fetchChats]);
+
+    // Set up interval to fetch unread counts every 10 seconds
+    const interval = setInterval(fetchUnreadCounts, 10000);
+
+    return () => clearInterval(interval);
+  }, [fetchChats, fetchUnreadCounts]);
 
   // Open chat modal; if the chat was marked as closed, remove it from closedChats.
   const openModal = (chatId) => {
@@ -190,13 +215,75 @@ function ChatList({ logout, username }) {
     }
   };
 
+  // Calculate total unread messages
+  const totalUnreadMessages = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+
   return (
     <div className="max-w-md mx-auto p-4 bg-white rounded shadow">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Chats</h1>
-        <button onClick={logout} className="px-3 py-1 bg-red-500 text-white rounded">
-          Logout
-        </button>
+        <div className="flex items-center">
+          {/* Notification Bell */}
+          <div className="relative mr-4">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
+            >
+              <FaBell className="text-blue-600" />
+              {totalUnreadMessages > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {totalUnreadMessages}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
+                <div className="p-3 border-b border-gray-200 font-medium">
+                  Notifications
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {Object.keys(unreadCounts).length > 0 ? (
+                    Object.entries(unreadCounts).map(([chatId, count]) => {
+                      const chat = chats.find(c => c.id.toString() === chatId);
+                      if (!chat || count === 0) return null;
+
+                      const otherUser = chat.participants.find(
+                        p => Number(p.id) !== Number(currentUserId)
+                      );
+
+                      return (
+                        <div
+                          key={chatId}
+                          className="p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => {
+                            openModal(Number(chatId));
+                            setShowNotifications(false);
+                          }}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">
+                              {otherUser?.username || 'Unknown'}
+                            </span>
+                            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
+                              {count} {count === 1 ? 'message' : 'messages'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-gray-500 text-center">No new messages</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <button onClick={logout} className="px-3 py-1 bg-red-500 text-white rounded">
+            Logout
+          </button>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -239,13 +326,24 @@ function ChatList({ logout, username }) {
           const chatName = otherParticipants.length
             ? [...new Set(otherParticipants.map((p) => p.username))].join(', ')
             : 'No participants';
+
+          // Get unread count for this chat
+          const unreadCount = unreadCounts[chat.id] || 0;
+
           return (
             <div
               key={chat.id}
               onClick={() => openModal(chat.id)}
               className="p-4 border rounded cursor-pointer hover:bg-gray-100 flex justify-between items-center"
             >
-              <span>{chatName}</span>
+              <div className="flex items-center">
+                <span>{chatName}</span>
+                {unreadCount > 0 && (
+                  <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -265,11 +363,10 @@ function ChatList({ logout, username }) {
           chatId={modalChatId}
           onClose={() => {
             setIsModalOpen(false);
-            // Optionally fetch chats to ensure sync
+            // Fetch chats and unread counts when closing the modal
             fetchChats();
+            fetchUnreadCounts();
           }}
-        // Remove onMessageSend since we're handling updates in ChatModal
-        // onMessageSend={fetchChats} 
         />
       )}
     </div>

@@ -9,5 +9,6 @@ urlpatterns = [
     path('users/create/', views.UserCreate.as_view(), name='user-create'),
     path('profile/', views.profile, name='profile'),
     path('users/', views.UserListView.as_view(), name='user-list'),
+    path('unread-counts/', views.unread_message_counts, name='unread-counts'),
     path('', views.index, name='index'),
 ]

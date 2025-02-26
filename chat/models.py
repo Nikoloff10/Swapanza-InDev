@@ -23,6 +23,7 @@ class Message(models.Model):
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    seen = models.BooleanField(default=False)
 
     def clean(self):
         pass

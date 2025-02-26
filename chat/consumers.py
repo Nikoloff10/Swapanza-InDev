@@ -21,6 +21,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+        
+        # Mark messages as seen when connecting to chat
+        await self.mark_messages_as_seen()
+        
         await self.accept()
 
     async def disconnect(self, close_code):
@@ -47,7 +51,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'id': message.id,
                     'content': message.content,
                     'sender': sender,
-                    'created_at': message.created_at.isoformat()
+                    'created_at': message.created_at.isoformat(),
+                    'seen': False
                 }
             }
         )
@@ -64,10 +69,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message': {
                 'id': message['id'],
                 'content': message['content'],
-                'sender': sender.username if sender else 'Unknown',  # Use username instead of id
-                'created_at': message['created_at']
+                'sender': sender_id,
+                'sender_username': sender.username if sender else 'Unknown',
+                'created_at': message['created_at'],
+                'seen': message['seen'] if 'seen' in message else False
             }
         }))
+        
+        # If this message is from another user, mark it as seen if the current user is the recipient
+        if sender_id != self.user.id:
+            await self.mark_message_as_seen(message['id'])
 
     @database_sync_to_async
     def save_message(self, content, sender_id):
@@ -76,7 +87,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return Message.objects.create(
             chat=chat,
             sender=user,
-            content=content
+            content=content,
+            seen=False  # New messages are not seen initially
         )
     
     @database_sync_to_async
@@ -85,3 +97,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
             return None
+            
+    @database_sync_to_async
+    def mark_message_as_seen(self, message_id):
+        try:
+            message = Message.objects.get(id=message_id)
+            message.seen = True
+            message.save()
+            return message
+        except Message.DoesNotExist:
+            return None
+            
+    @database_sync_to_async
+    def mark_messages_as_seen(self):
+        # Mark all messages in this chat as seen by the current user 
+        # if they were sent by other participants
+        chat = Chat.objects.get(id=self.chat_id)
+        Message.objects.filter(
+            chat=chat,
+            seen=False
+        ).exclude(
+            sender=self.user
+        ).update(seen=True)

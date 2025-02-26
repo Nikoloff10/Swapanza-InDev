@@ -37,15 +37,25 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
     }
   };
 
+  // Group messages by sender to track sequences
+  const messageCountBySender = {};
+
   // Memoize the message rendering
-  const MemoizedMessage = memo(({ msg, isCurrentUser, chat, index }) => {
+  const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
+    // Track messages by sender for name display
+    const senderId = msg.sender;
+    messageCountBySender[senderId] = (messageCountBySender[senderId] || 0) + 1;
+    const showSenderName = messageCountBySender[senderId] % 4 === 0;
+
+    // Set appropriate colors
     const messageStyle = isCurrentUser
-      ? 'bg-red-200 text-white'
-      : 'bg-yellow-200 text-black';
+      ? 'bg-red-200 text-red-800'  // Red for current user
+      : 'bg-yellow-200 text-yellow-800';  // Yellow for others
+
     return (
       <div className={`max-w-[70%] rounded-lg px-4 py-2 ${messageStyle}`}>
         {msg.content}
-        {((index + 1) % 4 === 0) && (
+        {showSenderName && (
           <div className="mt-1 text-xs font-semibold">
             {isCurrentUser
               ? 'You'
@@ -78,7 +88,6 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
                 msg={msg}
                 isCurrentUser={isCurrentUser}
                 chat={chat}
-                index={index}
               />
             </div>
           );

@@ -39,10 +39,20 @@ class UserCreate(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
 
 class UserListView(generics.ListAPIView):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['username']
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter users by search query excluding current user"""
+        queryset = User.objects.exclude(id=self.request.user.id)
+        search = self.request.query_params.get('search', None)
+        
+        if search:
+            # Match even partial usernames - make search more generous
+            queryset = queryset.filter(username__icontains=search)
+            
+        # Limit to 10 results for performance
+        return queryset[:10]
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -65,24 +75,26 @@ class ChatListCreateView(generics.ListCreateAPIView):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def unread_message_counts(request):
-    """Return counts of unread messages for each chat the user is part of."""
+    """
+    Get counts of unread messages for all user's chats
+    """
     user = request.user
+    
+    # Get all chats the user is part of
     chats = Chat.objects.filter(participants=user)
     
-    
+    # For each chat, count unread messages not sent by this user
     unread_counts = {}
     for chat in chats:
-        
         count = Message.objects.filter(
-            chat=chat,
+            chat=chat, 
             seen=False
-        ).exclude(
-            sender=user
-        ).count()
+        ).exclude(sender=user).count()
         
         if count > 0:
             unread_counts[chat.id] = count
-            
+    
+    print(f"Unread counts for user {user.username}: {unread_counts}")
     return Response(unread_counts)
 
 class ChatDetailView(generics.RetrieveUpdateAPIView):
@@ -150,6 +162,52 @@ class MessageListCreateView(generics.ListCreateAPIView):
             return Response({'detail': 'Error saving message.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response(self.get_serializer(message).data, status=status.HTTP_201_CREATED)
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def user_profile(request, user_id):
+    """Get or update a user's profile"""
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Only allow users to update their own profile
+    if request.method == 'PUT' and request.user.id != user_id:
+        return Response({"error": "Cannot edit other users' profiles"}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    
+    if request.method == 'PUT':
+        # Don't allow updating username or password through this endpoint for security
+        data = request.data.copy()
+        serializer = UserSerializer(user, data=data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reset_notifications(request):
+    """Reset all unread messages for the user"""
+    user = request.user
+    
+    # Get all chats the user is part of
+    chats = Chat.objects.filter(participants=user)
+    
+    # For each chat, mark messages as read
+    total_updated = 0
+    for chat in chats:
+        updated = Message.objects.filter(
+            chat=chat,
+            seen=False
+        ).exclude(sender=user).update(seen=True)
+        total_updated += updated
+    
+    return Response({"message": f"Reset {total_updated} notifications"}, status=status.HTTP_200_OK)
 
 def index(request):
     return render(request, 'index.html')

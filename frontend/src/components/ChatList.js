@@ -1,229 +1,297 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import axios from 'axios';
-import ChatModal from './ChatModal';
-import { FaBell } from 'react-icons/fa'; // Import bell icon
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import axios from "axios";
+import ChatModal from "./ChatModal";
+import { FaBell } from "react-icons/fa";
 
 function ChatList({ logout, username }) {
-  const token = localStorage.getItem('token');
-  const currentUserId = Number(localStorage.getItem('userId') || 0);
+  const token = localStorage.getItem("token");
+  const currentUserId = Number(localStorage.getItem("userId") || 0);
   const [chats, setChats] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [modalChatId, setModalChatId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [showNotifications, setShowNotifications] = useState(false);
+  const searchTimeoutRef = useRef(null);
 
   // Get IDs of closed chats from localStorage
-  const getClosedChatIds = () =>
-    JSON.parse(localStorage.getItem('closedChats') || '[]').map((id) => id.toString());
-
-  // Remove chat id from closed chats when opening it
-  const removeClosedChatId = (chatId) => {
-    const closed = getClosedChatIds().filter((id) => id !== chatId.toString());
-    localStorage.setItem('closedChats', JSON.stringify(closed));
-  };
-
-  // Add chat id to localStorage for closed chats
-  const addClosedChatId = (chatId) => {
-    const closed = getClosedChatIds();
-    if (!closed.includes(chatId.toString())) {
-      const newClosed = [...closed, chatId.toString()];
-      localStorage.setItem('closedChats', JSON.stringify(newClosed));
-    }
-  };
-
-  // Fetch chats from the backend and filter out closed chats.
-  const fetchChats = useCallback(async () => {
-    if (!currentUserId || !token) return;
+  const getClosedChatIds = useCallback(() => {
     try {
-      const response = await axios.get('/api/chats/', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const closedIds = getClosedChatIds();
-      // Filter out chats whose id is among the closed IDs.
-      const activeChats = response.data.filter(
-        (chat) => !closedIds.includes(chat.id.toString())
+      return JSON.parse(localStorage.getItem("closedChats") || "[]").map((id) =>
+        id.toString()
       );
-      // Also ensure that there are no duplicate chats by id.
-      const unique = activeChats.reduce((acc, curr) => {
-        if (!acc.find((chat) => Number(chat.id) === Number(curr.id))) {
-          acc.push(curr);
-        }
-        return acc;
-      }, []);
-      setChats(unique);
-
-      // Fetch unread message counts for each chat
-      fetchUnreadCounts();
-    } catch (error) {
-      console.error('Error fetching chats:', error.response || error);
+    } catch (e) {
+      console.error("Error parsing closedChats from localStorage:", e);
+      return [];
     }
-  }, [currentUserId, token]);
+  }, []);
 
   // Fetch unread message counts
   const fetchUnreadCounts = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await axios.get('/api/unread-counts/', {
+      console.log("Fetching unread counts...");
+      const response = await axios.get("/api/unread-counts/", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setUnreadCounts(response.data);
+      console.log("Unread counts received:", response.data);
+
+      // Get closed chats
+      const closedChatIds = getClosedChatIds();
+      console.log("Closed chat IDs:", closedChatIds);
+
+      // Filter out notifications for closed chats
+      const filteredCounts = {};
+      Object.entries(response.data).forEach(([chatId, count]) => {
+        if (!closedChatIds.includes(chatId.toString()) && count > 0) {
+          filteredCounts[chatId] = count;
+        }
+      });
+
+      console.log("Filtered unread counts:", filteredCounts);
+      setUnreadCounts(filteredCounts);
     } catch (error) {
-      console.error('Error fetching unread counts:', error.response || error);
+      console.error("Error fetching unread counts:", error.response || error);
     }
-  }, [token]);
+  }, [token, getClosedChatIds]);
 
-  useEffect(() => {
-    fetchChats();
-
-    // Set up interval to fetch unread counts every 10 seconds
-    const interval = setInterval(fetchUnreadCounts, 10000);
-
-    return () => clearInterval(interval);
-  }, [fetchChats, fetchUnreadCounts]);
-
-  // Open chat modal; if the chat was marked as closed, remove it from closedChats.
-  const openModal = (chatId) => {
-    removeClosedChatId(chatId);
-    setModalChatId(chatId);
-    setIsModalOpen(true);
-  };
-
-  // Remove (close) a single chat and store its ID in localStorage.
-  const removeChat = (chatId) => {
-    addClosedChatId(chatId);
-    setChats((prev) =>
-      prev.filter((chat) => Number(chat.id) !== Number(chatId))
-    );
-  };
-
-  // Close all chats: mark all as closed and clear the chats list.
-  const closeAllChats = () => {
-    chats.forEach((chat) => addClosedChatId(chat.id));
-    setChats([]);
-  };
-
-  // Search for users excluding current user and those already in active chats.
+  // Function to search users
   const searchUsers = useCallback(
     async (query) => {
-      if (!currentUserId || !token) return;
+      // Only require one character for search
       if (!query.trim()) {
         setSearchResults([]);
         return;
       }
+
       try {
-        const response = await axios.get('/api/users/', {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { search: query },
-        });
-        const inChatIds = new Set();
-        chats.forEach((chat) => {
-          chat.participants.forEach((p) => {
-            if (Number(p.id) !== Number(currentUserId)) {
-              inChatIds.add(Number(p.id));
-            }
-          });
-        });
-        const filtered = response.data.filter(
-          (user) =>
-            Number(user.id) !== Number(currentUserId) &&
-            !inChatIds.has(Number(user.id))
+        console.log("Searching for users with query:", query);
+        const response = await axios.get(
+          `/api/users/?search=${encodeURIComponent(query)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
         );
-        setSearchResults(filtered);
+
+        console.log("Search results:", response.data);
+
+        // Filter out the current user from results
+        const filteredResults = response.data.filter(
+          (user) => Number(user.id) !== Number(currentUserId)
+        );
+
+        setSearchResults(filteredResults);
       } catch (error) {
-        console.error('Error searching users:', error.response || error);
-      }
-    },
-    [currentUserId, token, chats]
-  );
-
-  const searchTimeout = useRef(null);
-
-  useEffect(() => {
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
-    }
-    searchTimeout.current = setTimeout(() => {
-      if (searchQuery.trim()) {
-        searchUsers(searchQuery);
-      } else {
+        console.error("Error searching users:", error);
         setSearchResults([]);
       }
-    }, 300);
-    return () => clearTimeout(searchTimeout.current);
-  }, [searchQuery, chats, searchUsers]);
+    },
+    [token, currentUserId]
+  );
 
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      searchUsers(searchQuery);
-    }
-  }, [chats, searchQuery, searchUsers]);
+  const openModal = useCallback((chatId) => {
+    setModalChatId(chatId);
+    setIsModalOpen(true);
+  }, []);
 
-  // Create new chat. If it already exists, reopen it
-  const createChat = async (otherUserId) => {
+  // Create a chat with a user
+  const createChat = useCallback(async (otherUserId) => {
     try {
-      // First try to get the chat from the backend directly
-      const response = await axios.get('/api/chats/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // Look for existing chat in ALL chats, not just active ones
-      const existingChat = response.data.find(
-        (chat) =>
-          chat.participants.some((p) => Number(p.id) === Number(otherUserId)) &&
-          chat.participants.some((p) => Number(p.id) === Number(currentUserId))
+      console.log('Attempting to create chat with user ID:', otherUserId);
+      
+      // First check if a chat with this user already exists
+      const existingChat = chats.find(chat => 
+        chat.participants.some(participant => 
+          Number(participant.id) === Number(otherUserId)
+        )
       );
-
+      
       if (existingChat) {
-        // Remove from closed chats if necessary
-        removeClosedChatId(existingChat.id);
-        // Fetch fresh data for existing chat
-        const chatResponse = await axios.get(`/api/chats/${existingChat.id}/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        // Update chat in state with fresh data
-        setChats(prevChats => {
-          const chatExists = prevChats.some(c => c.id === existingChat.id);
-          if (chatExists) {
-            return prevChats.map(c =>
-              c.id === existingChat.id ? chatResponse.data : c
-            );
-          } else {
-            // Add to chats if it wasn't there
-            return [...prevChats, chatResponse.data];
-          }
-        });
+        console.log('Chat already exists, opening existing chat:', existingChat.id);
+        
+        // Clear search
+        setSearchQuery('');
+        setSearchResults([]);
+        
+        // Open the existing chat
         openModal(existingChat.id);
         return;
       }
-
-      // Create new chat if none exists
-      const createResponse = await axios.post(
+      
+      console.log('No existing chat found, creating new chat');
+      // If no existing chat, create a new one
+      const response = await axios.post(
         '/api/chats/',
-        { participants: [otherUserId, currentUserId] },
+        { participants: [otherUserId] },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      const newChat = createResponse.data;
-      setChats(prevChats => [...prevChats, newChat]);
-      removeClosedChatId(newChat.id);
-      openModal(newChat.id);
+      
+      console.log('New chat created:', response.data);
+      
+      // Add the new chat to the list and open it
+      setChats(prevChats => [...prevChats, response.data]);
+      
+      // Clear search
+      setSearchQuery('');
+      setSearchResults([]);
+      
+      // Open the chat modal
+      openModal(response.data.id);
     } catch (error) {
-      console.error('Error with chat:', error.response || error);
+      console.error('Error creating chat:', error);
     }
-  };
+  }, [token, chats, openModal]);
+
+  // Handle search input with debounce
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout with shorter delay (150ms instead of 300ms)
+    searchTimeoutRef.current = setTimeout(() => {
+      searchUsers(searchQuery);
+    }, 150);
+
+    // Cleanup function
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, searchUsers]);
+
+  // Fetch chats on mount and when token changes
+  const fetchChats = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      const response = await axios.get("/api/chats/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Get closed chats
+      const closedChatIds = getClosedChatIds();
+
+      // Filter out closed chats
+      const filteredChats = response.data.filter(
+        (chat) => !closedChatIds.includes(chat.id.toString())
+      );
+
+      setChats(filteredChats);
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+    }
+  }, [token, getClosedChatIds]);
+
+  useEffect(() => {
+    fetchChats();
+    fetchUnreadCounts();
+
+    // Refresh data periodically
+    const interval = setInterval(() => {
+      fetchUnreadCounts();
+    }, 10000); // every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchChats, fetchUnreadCounts]);
+
+  // Function to open chat modal
+
+  // Handle when messages are read
+  const handleMessagesRead = useCallback(() => {
+    console.log("Messages read callback triggered");
+    // Refresh unread counts when messages are marked as read
+    fetchUnreadCounts();
+  }, [fetchUnreadCounts]);
+
+  const handleNewMessage = useCallback(() => {
+    console.log("New message callback triggered");
+    // Refresh unread counts when a new message arrives
+    fetchUnreadCounts();
+  }, [fetchUnreadCounts]);
+
+  // Remove a chat (mark as closed)
+  const removeChat = useCallback(
+    (chatId) => {
+      // Add to closed chats in localStorage
+      const closedChatIds = getClosedChatIds();
+      if (!closedChatIds.includes(chatId.toString())) {
+        localStorage.setItem(
+          "closedChats",
+          JSON.stringify([...closedChatIds, chatId.toString()])
+        );
+      }
+
+      // Remove from UI
+      setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId));
+
+      // Update unread counts
+      setUnreadCounts((prevCounts) => {
+        const newCounts = { ...prevCounts };
+        delete newCounts[chatId];
+        return newCounts;
+      });
+    },
+    [getClosedChatIds]
+  );
+
+  // Close all chats
+  const closeAllChats = useCallback(() => {
+    // Add all chat IDs to closed chats
+    const allChatIds = chats.map((chat) => chat.id.toString());
+
+    // Store in localStorage
+    const existingClosedChats = getClosedChatIds();
+    const combinedClosedChats = [
+      ...new Set([...existingClosedChats, ...allChatIds]),
+    ];
+    localStorage.setItem("closedChats", JSON.stringify(combinedClosedChats));
+
+    // Clear UI state
+    setChats([]);
+    setUnreadCounts({});
+
+    // Force refresh data from server to ensure UI is correct
+    setTimeout(() => {
+      fetchChats();
+      fetchUnreadCounts();
+    }, 300);
+  }, [chats, getClosedChatIds, fetchChats, fetchUnreadCounts]);
+
+  // Reset all notifications
+  const resetAllNotifications = useCallback(async () => {
+    try {
+      await axios.post(
+        "/api/reset-notifications/",
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Clear notifications
+      setUnreadCounts({});
+
+      // Refresh the counts from server
+      fetchUnreadCounts();
+    } catch (error) {
+      console.error("Error resetting notifications:", error);
+    }
+  }, [token, fetchUnreadCounts]);
 
   // Calculate total unread messages
-  const totalUnreadMessages = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+  const totalUnreadMessages =
+    Object.values(unreadCounts).reduce((sum, count) => sum + count, 0) || 0;
 
   return (
     <div className="max-w-md mx-auto p-4 bg-white rounded shadow">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Chats</h1>
         <div className="flex items-center">
-          {/* Notification Bell */}
           <div className="relative mr-4">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
@@ -237,20 +305,26 @@ function ChatList({ logout, username }) {
               )}
             </button>
 
-            {/* Notification Dropdown */}
             {showNotifications && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
-                <div className="p-3 border-b border-gray-200 font-medium">
-                  Notifications
+                <div className="p-3 border-b border-gray-200 font-medium flex justify-between items-center">
+                  <span>Notifications</span>
+                  <button
+                    onClick={resetAllNotifications}
+                    className="text-xs text-blue-500 hover:text-blue-700"
+                  >
+                    Reset All
+                  </button>
                 </div>
                 <div className="max-h-60 overflow-y-auto">
                   {Object.keys(unreadCounts).length > 0 ? (
                     Object.entries(unreadCounts).map(([chatId, count]) => {
-                      const chat = chats.find(c => c.id.toString() === chatId);
-                      if (!chat || count === 0) return null;
-
-                      const otherUser = chat.participants.find(
-                        p => Number(p.id) !== Number(currentUserId)
+                      // Find chat info to display name
+                      const chat = chats.find(
+                        (c) => c.id.toString() === chatId
+                      );
+                      const otherUser = chat?.participants?.find(
+                        (p) => Number(p.id) !== Number(currentUserId)
                       );
 
                       return (
@@ -264,23 +338,28 @@ function ChatList({ logout, username }) {
                         >
                           <div className="flex justify-between items-center">
                             <span className="font-medium">
-                              {otherUser?.username || 'Unknown'}
+                              {otherUser?.username || "Unknown"}
                             </span>
                             <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
-                              {count} {count === 1 ? 'message' : 'messages'}
+                              {count} {count === 1 ? "message" : "messages"}
                             </span>
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <div className="p-4 text-gray-500 text-center">No new messages</div>
+                    <div className="p-4 text-gray-500 text-center">
+                      No new messages
+                    </div>
                   )}
                 </div>
               </div>
             )}
           </div>
-          <button onClick={logout} className="px-3 py-1 bg-red-500 text-white rounded">
+          <button
+            onClick={logout}
+            className="px-3 py-1 bg-red-500 text-white rounded"
+          >
             Logout
           </button>
         </div>
@@ -320,14 +399,11 @@ function ChatList({ logout, username }) {
 
       <div className="space-y-2">
         {chats.map((chat) => {
-          const otherParticipants = chat.participants.filter(
+          // Find the other participant (assuming 2-person chats)
+          const otherUser = chat.participants.find(
             (p) => Number(p.id) !== Number(currentUserId)
           );
-          const chatName = otherParticipants.length
-            ? [...new Set(otherParticipants.map((p) => p.username))].join(', ')
-            : 'No participants';
-
-          // Get unread count for this chat
+          const chatName = otherUser ? otherUser.username : "Unknown User";
           const unreadCount = unreadCounts[chat.id] || 0;
 
           return (
@@ -367,6 +443,8 @@ function ChatList({ logout, username }) {
             fetchChats();
             fetchUnreadCounts();
           }}
+          onMessagesRead={handleMessagesRead}
+          onNewMessage={handleNewMessage}
         />
       )}
     </div>

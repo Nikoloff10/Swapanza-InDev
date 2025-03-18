@@ -38,32 +38,35 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
   };
 
   // Group messages by sender to track sequences
-  const messageCountBySender = {};
+  
 
   // Memoize the message rendering
   const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
-    // Track messages by sender for name display
-    const senderId = msg.sender;
-    messageCountBySender[senderId] = (messageCountBySender[senderId] || 0) + 1;
-    const showSenderName = messageCountBySender[senderId] % 4 === 0;
-
-    // Set appropriate colors
+    // Remove this unused variable:
+    // const messageCountBySender = {};
+    
+    // Set appropriate styles based on who sent the message
+    const messageWrapperStyle = isCurrentUser
+      ? 'flex justify-end mb-2'  // Right-aligned for current user
+      : 'flex justify-start mb-2';  // Left-aligned for other users
+      
     const messageStyle = isCurrentUser
-      ? 'bg-red-200 text-red-800'  // Red for current user
-      : 'bg-yellow-200 text-yellow-800';  // Yellow for others
-
+      ? 'bg-blue-500 text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words'  // Blue for current user
+      : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words';  // Gray for others
+  
+    // Get sender's username
+    const senderUsername = chat.participants.find(
+      (p) => Number(p.id) === Number(msg.sender)
+    )?.username || 'Unknown';
+  
     return (
-      <div className={`max-w-[70%] rounded-lg px-4 py-2 ${messageStyle}`}>
-        {msg.content}
-        {showSenderName && (
-          <div className="mt-1 text-xs font-semibold">
-            {isCurrentUser
-              ? 'You'
-              : chat.participants.find(
-                (p) => Number(p.id) === Number(msg.sender)
-              )?.username}
+      <div className={messageWrapperStyle}>
+        <div className={messageStyle}>
+          <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+          <div className="text-xs mt-1 opacity-75">
+            {isCurrentUser ? 'You' : senderUsername}
           </div>
-        )}
+        </div>
       </div>
     );
   });

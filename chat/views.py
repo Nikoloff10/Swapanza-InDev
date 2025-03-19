@@ -12,6 +12,30 @@ from rest_framework import filters, pagination
 
 User = get_user_model()
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def find_chat_by_user(request, user_id):
+    """
+    Find an existing chat between the current user and the specified user
+    """
+    try:
+        # Find chats where both users are participants
+        other_user = get_object_or_404(User, id=user_id)
+        chat = Chat.objects.filter(
+            participants=request.user
+        ).filter(
+            participants=other_user
+        ).first()
+        
+        if chat:
+            serializer = ChatSerializer(chat)
+            return Response(serializer.data)
+        else:
+            return Response({"detail": "Chat not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
 def chat_messages(request, chat_id):

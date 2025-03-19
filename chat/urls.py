@@ -12,5 +12,6 @@ urlpatterns = [
     path('users/', views.UserListView.as_view(), name='user-list'),
     path('unread-counts/', views.unread_message_counts, name='unread-counts'),
     path('reset-notifications/', views.reset_notifications, name='reset-notifications'),
+    path('chats/find-by-user/<int:user_id>/', views.find_chat_by_user, name='find-chat-by-user'),
     path('', views.index, name='index'),
 ]

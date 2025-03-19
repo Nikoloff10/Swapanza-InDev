@@ -42,17 +42,10 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
 
   // Memoize the message rendering
   const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
-    // Remove this unused variable:
-    // const messageCountBySender = {};
-    
-    // Set appropriate styles based on who sent the message
-    const messageWrapperStyle = isCurrentUser
-      ? 'flex justify-end mb-2'  // Right-aligned for current user
-      : 'flex justify-start mb-2';  // Left-aligned for other users
-      
+    // Don't add flex justify-end/start here, as it's now in the parent wrapper
     const messageStyle = isCurrentUser
-      ? 'bg-blue-500 text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words'  // Blue for current user
-      : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words';  // Gray for others
+      ? 'bg-blue-500 text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words'
+      : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words';
   
     // Get sender's username
     const senderUsername = chat.participants.find(
@@ -60,17 +53,14 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
     )?.username || 'Unknown';
   
     return (
-      <div className={messageWrapperStyle}>
-        <div className={messageStyle}>
-          <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
-          <div className="text-xs mt-1 opacity-75">
-            {isCurrentUser ? 'You' : senderUsername}
-          </div>
+      <div className={messageStyle}>
+        <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+        <div className="text-xs mt-1 opacity-75">
+          {isCurrentUser ? 'You' : senderUsername}
         </div>
       </div>
     );
   });
-
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">

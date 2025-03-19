@@ -101,12 +101,45 @@ function ChatList({ logout, username }) {
     try {
       console.log('Attempting to create chat with user ID:', otherUserId);
       
-      // First check if a chat with this user already exists
-      const existingChat = chats.find(chat => 
+      // Check for existing chat with this user, including closed ones
+      let existingChat = null;
+      
+      // First check visible chats
+      existingChat = chats.find(chat => 
         chat.participants.some(participant => 
           Number(participant.id) === Number(otherUserId)
         )
       );
+      
+      // If not found in visible chats, check on the server
+      if (!existingChat) {
+        try {
+          const response = await axios.get(
+            `/api/chats/find-by-user/${otherUserId}/`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          if (response.data && response.data.id) {
+            existingChat = response.data;
+            
+            // Remove from closed chats in localStorage if it was closed
+            const closedChatIds = getClosedChatIds();
+            if (closedChatIds.includes(existingChat.id.toString())) {
+              const updatedClosedChats = closedChatIds.filter(
+                id => id !== existingChat.id.toString()
+              );
+              localStorage.setItem("closedChats", JSON.stringify(updatedClosedChats));
+            }
+            
+            // Add to visible chats if not already there
+            if (!chats.some(chat => chat.id === existingChat.id)) {
+              setChats(prevChats => [...prevChats, existingChat]);
+            }
+          }
+        } catch (error) {
+          console.log('No existing chat found on server:', error);
+        }
+      }
       
       if (existingChat) {
         console.log('Chat already exists, opening existing chat:', existingChat.id);
@@ -142,7 +175,7 @@ function ChatList({ logout, username }) {
     } catch (error) {
       console.error('Error creating chat:', error);
     }
-  }, [token, chats, openModal]);
+  }, [token, chats, openModal, getClosedChatIds]);
 
   // Handle search input with debounce
   useEffect(() => {
@@ -217,7 +250,7 @@ function ChatList({ logout, username }) {
   // Remove a chat (mark as closed)
   const removeChat = useCallback(
     (chatId) => {
-      // Add to closed chats in localStorage
+      // Just hide the chat, don't delete it
       const closedChatIds = getClosedChatIds();
       if (!closedChatIds.includes(chatId.toString())) {
         localStorage.setItem(
@@ -225,10 +258,10 @@ function ChatList({ logout, username }) {
           JSON.stringify([...closedChatIds, chatId.toString()])
         );
       }
-
+  
       // Remove from UI
       setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId));
-
+  
       // Update unread counts
       setUnreadCounts((prevCounts) => {
         const newCounts = { ...prevCounts };

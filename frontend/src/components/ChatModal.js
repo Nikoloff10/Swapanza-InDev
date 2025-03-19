@@ -10,9 +10,9 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const ws = useRef(null);
   const messagesEndRef = useRef(null);
+
+  const [currentUserId, setCurrentUserId] = useState(Number(localStorage.getItem('userId') || 0));
   const wsRetryCount = useRef(0);
-  // Remove unused maxRetries variable
-  const currentUserId = Number(localStorage.getItem('userId') || 0);
   const token = localStorage.getItem('token');
 
   // Scroll to bottom of messages
@@ -142,6 +142,29 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     }
   }, [chatId, token]);
 
+  useEffect(() => {
+    // Find the current user's ID from the chat participants when chat is loaded
+    if (chat && chat.participants) {
+      // Get current username from localStorage, which should be more reliable
+      const currentUsername = localStorage.getItem('username');
+      
+      if (currentUsername) {
+        // Find the participant with matching username
+        const currentUser = chat.participants.find(p => p.username === currentUsername);
+        
+        if (currentUser) {
+          console.log('Found current user in participants:', currentUser);
+          // Set the currentUserId based on the found participant
+          setCurrentUserId(Number(currentUser.id));
+        } else {
+          console.warn('Current username not found in chat participants');
+        }
+      } else {
+        console.warn('No username found in localStorage');
+      }
+    }
+  }, [chat]);
+
   // Initialize: fetch chat and set up WebSocket
   useEffect(() => {
     fetchChat();
@@ -186,30 +209,21 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
   // Render a message component with memoization
   const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
-    // Remove this unused variable completely:
-    // const messageCountBySender = {};
-    
-    // Set appropriate styles based on who sent the message
-    const messageWrapperStyle = isCurrentUser
-      ? 'flex justify-end mb-2'  
-      : 'flex justify-start mb-2';
-      
+    // DO NOT include any flex or justify classes here - those should only be in the parent wrapper
     const messageStyle = isCurrentUser
       ? 'bg-blue-500 text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words'
       : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words';
-  
+    
     // Get sender's username
     const senderUsername = chat.participants.find(
       (p) => Number(p.id) === Number(msg.sender)
     )?.username || 'Unknown';
-  
+    
     return (
-      <div className={messageWrapperStyle}>
-        <div className={messageStyle}>
-          <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
-          <div className="text-xs mt-1 opacity-75">
-            {isCurrentUser ? 'You' : senderUsername}
-          </div>
+      <div className={messageStyle}>
+        <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+        <div className="text-xs mt-1 opacity-75">
+          {isCurrentUser ? 'You' : senderUsername}
         </div>
       </div>
     );
@@ -252,14 +266,27 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 my-4">No messages yet</div>
           ) : (
-            messages.map((msg) => (
-              <MemoizedMessage
-                key={msg.id}
-                msg={msg}
-                isCurrentUser={Number(msg.sender) === Number(currentUserId)}
-                chat={chat}
-              />
-            ))
+            messages.map((msg) => {
+              console.log('Message data:', {
+                msgSender: msg.sender,
+                msgSenderId: Number(msg.sender),
+                currentUserId: currentUserId,
+                isCurrentUser: Number(msg.sender) === Number(currentUserId)
+              });
+              const isCurrentUser = Number(msg.sender) === Number(currentUserId);
+              return (
+                <div 
+                  key={msg.id} 
+                  className={isCurrentUser ? 'flex justify-end mb-2' : 'flex justify-start mb-2'}
+                >
+                  <MemoizedMessage
+                    msg={msg}
+                    isCurrentUser={isCurrentUser}
+                    chat={chat}
+                  />
+                </div>
+              );
+            })
           )}
           <div ref={messagesEndRef} />
         </div>

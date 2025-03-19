@@ -34,10 +34,10 @@ function LoginForm({ login }) {
       const userId = profileResponse.data.id; // Extract user ID from profile
 
       localStorage.setItem('token', token);
-      localStorage.setItem('username', username);
-      localStorage.setItem('userId', userId); // Store the user ID
+      localStorage.setItem('username', username); // Use the username state variable
+      localStorage.setItem('userId', userId.toString()); // Use userId from profile response
       console.log("LoginForm: userId set to localStorage:", userId);
-      login(token, username);
+      login(token, username, userId);
 
       navigate('/chats', { replace: true });
 

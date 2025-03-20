@@ -5,6 +5,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.views.decorators.csrf import csrf_exempt
+import cloudinary.uploader
 from swapanzaBackend import settings
 from .models import Chat, Message
 from .serializers import ChatSerializer, MessageSerializer, UserSerializer
@@ -23,7 +24,7 @@ User = get_user_model()
 @parser_classes([MultiPartParser, FormParser])
 def upload_profile_image(request, user_id):
     """
-    Upload a profile image
+    Upload a profile image to Cloudinary
     """
     # Only allow users to update their own profile
     if str(request.user.id) != str(user_id):
@@ -35,27 +36,26 @@ def upload_profile_image(request, user_id):
     user = request.user
     image = request.FILES['profile_image']
     
-    # Create media directories if they don't exist
-    media_path = os.path.join(settings.MEDIA_ROOT, 'profile_images')
-    os.makedirs(media_path, exist_ok=True)
-    
-    # Generate a unique filename to prevent overwriting
-    filename = f"{user.id}_{image.name}"
-    file_path = os.path.join(media_path, filename)
-    
-    # Save the uploaded file
-    with open(file_path, 'wb+') as destination:
-        for chunk in image.chunks():
-            destination.write(chunk)
-    
-    # Set the URL to be served via the MEDIA_URL
-    user.profile_image_url = f"{settings.MEDIA_URL}profile_images/{filename}"
-    user.save()
-    
-    return Response({
-        "profile_image_url": user.profile_image_url,
-        "username": user.username
-    })
+    try:
+        # Upload to Cloudinary
+        upload_result = cloudinary.uploader.upload(
+            image,
+            folder="swapanza_profiles",
+            public_id=f"user_{user.id}",
+            overwrite=True,
+            resource_type="image"
+        )
+        
+        # Save the Cloudinary URL to the user profile
+        user.profile_image_url = upload_result['secure_url']
+        user.save()
+        
+        return Response({
+            "profile_image_url": user.profile_image_url,
+            "username": user.username
+        })
+    except Exception as e:
+        return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import ChatModal from "./ChatModal";
-import { FaBell } from "react-icons/fa";
+import { useNavigate } from 'react-router-dom';
+import { FaBell, FaUser } from "react-icons/fa";
 
 function ChatList({ logout, username }) {
   const token = localStorage.getItem("token");
@@ -14,6 +15,12 @@ function ChatList({ logout, username }) {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [showNotifications, setShowNotifications] = useState(false);
   const searchTimeoutRef = useRef(null);
+  const navigate = useNavigate();
+
+  const handleProfileClick = () => {
+    navigate('/profile');
+  };
+  
 
   // Get IDs of closed chats from localStorage
   const getClosedChatIds = useCallback(() => {
@@ -320,168 +327,198 @@ function ChatList({ logout, username }) {
   const totalUnreadMessages =
     Object.values(unreadCounts).reduce((sum, count) => sum + count, 0) || 0;
 
-  return (
-    <div className="max-w-md mx-auto p-4 bg-white rounded shadow">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Chats</h1>
-        <div className="flex items-center">
-          <div className="relative mr-4">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
+    return (
+      <div className="max-w-md mx-auto p-4 bg-white rounded shadow">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center">
+            {/* Profile Picture (circular) */}
+            <div 
+              className="h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 cursor-pointer overflow-hidden"
+              onClick={handleProfileClick}
             >
-              <FaBell className="text-blue-600" />
-              {totalUnreadMessages > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {totalUnreadMessages}
-                </span>
+              {localStorage.getItem('profileImageUrl') ? (
+                <img 
+                  src={localStorage.getItem('profileImageUrl')} 
+                  alt={username} 
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-lg font-bold">{username ? username[0].toUpperCase() : '?'}</span>
               )}
-            </button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
-                <div className="p-3 border-b border-gray-200 font-medium flex justify-between items-center">
-                  <span>Notifications</span>
-                  <button
-                    onClick={resetAllNotifications}
-                    className="text-xs text-blue-500 hover:text-blue-700"
-                  >
-                    Reset All
-                  </button>
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  {Object.keys(unreadCounts).length > 0 ? (
-                    Object.entries(unreadCounts).map(([chatId, count]) => {
-                      // Find chat info to display name
-                      const chat = chats.find(
-                        (c) => c.id.toString() === chatId
-                      );
-                      const otherUser = chat?.participants?.find(
-                        (p) => Number(p.id) !== Number(currentUserId)
-                      );
-
-                      return (
-                        <div
-                          key={chatId}
-                          className="p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => {
-                            openModal(Number(chatId));
-                            setShowNotifications(false);
-                          }}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">
-                              {otherUser?.username || "Unknown"}
-                            </span>
-                            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
-                              {count} {count === 1 ? "message" : "messages"}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="p-4 text-gray-500 text-center">
-                      No new messages
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            </div>
+            <h1 className="text-2xl font-bold">Chats</h1>
           </div>
-          <button
-            onClick={logout}
-            className="px-3 py-1 bg-red-500 text-white rounded"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full p-2 border rounded"
-        />
-        {searchResults.length > 0 && (
-          <div className="mt-2 border border-gray-200 rounded shadow">
-            {searchResults.map((user) => (
-              <div
-                key={user.id}
-                onClick={() => createChat(user.id)}
-                className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-              >
-                {user.username}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="mb-4">
-        <button
-          onClick={closeAllChats}
-          className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-        >
-          Close All Chats
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        {chats.map((chat) => {
-          // Find the other participant (assuming 2-person chats)
-          const otherUser = chat.participants.find(
-            (p) => Number(p.id) !== Number(currentUserId)
-          );
-          const chatName = otherUser ? otherUser.username : "Unknown User";
-          const unreadCount = unreadCounts[chat.id] || 0;
-
-          return (
-            <div
-              key={chat.id}
-              onClick={() => openModal(chat.id)}
-              className="p-4 border rounded cursor-pointer hover:bg-gray-100 flex justify-between items-center"
+          
+          <div className="flex items-center">
+            {/* Profile button */}
+            <button
+              onClick={handleProfileClick}
+              className="mr-3 p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
+              title="View Profile"
             >
-              <div className="flex items-center">
-                <span>{chatName}</span>
-                {unreadCount > 0 && (
-                  <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {unreadCount}
+              <FaUser className="text-blue-600" />
+            </button>
+            
+            {/* Notifications */}
+            <div className="relative mr-4">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
+              >
+                <FaBell className="text-blue-600" />
+                {totalUnreadMessages > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {totalUnreadMessages}
                   </span>
                 )}
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeChat(chat.id);
-                }}
-                className="ml-2 px-2 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm"
-              >
-                Close
               </button>
+    
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
+                  <div className="p-3 border-b border-gray-200 font-medium flex justify-between items-center">
+                    <span>Notifications</span>
+                    <button
+                      onClick={resetAllNotifications}
+                      className="text-xs text-blue-500 hover:text-blue-700"
+                    >
+                      Reset All
+                    </button>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {Object.keys(unreadCounts).length > 0 ? (
+                      Object.entries(unreadCounts).map(([chatId, count]) => {
+                        // Find chat info to display name
+                        const chat = chats.find(
+                          (c) => c.id.toString() === chatId
+                        );
+                        const otherUser = chat?.participants?.find(
+                          (p) => Number(p.id) !== Number(currentUserId)
+                        );
+    
+                        return (
+                          <div
+                            key={chatId}
+                            className="p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => {
+                              openModal(Number(chatId));
+                              setShowNotifications(false);
+                            }}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">
+                                {otherUser?.username || "Unknown"}
+                              </span>
+                              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
+                                {count} {count === 1 ? "message" : "messages"}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="p-4 text-gray-500 text-center">
+                        No new messages
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          );
-        })}
+            
+            {/* Logout button */}
+            <button
+              onClick={logout}
+              className="px-3 py-1 bg-red-500 text-white rounded"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+    
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Search users..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full p-2 border rounded"
+          />
+          {searchResults.length > 0 && (
+            <div className="mt-2 border border-gray-200 rounded shadow">
+              {searchResults.map((user) => (
+                <div
+                  key={user.id}
+                  onClick={() => createChat(user.id)}
+                  className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                >
+                  {user.username}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+    
+        <div className="mb-4">
+          <button
+            onClick={closeAllChats}
+            className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            Close All Chats
+          </button>
+        </div>
+    
+        <div className="space-y-2">
+          {chats.map((chat) => {
+            // Find the other participant (assuming 2-person chats)
+            const otherUser = chat.participants.find(
+              (p) => Number(p.id) !== Number(currentUserId)
+            );
+            const chatName = otherUser ? otherUser.username : "Unknown User";
+            const unreadCount = unreadCounts[chat.id] || 0;
+    
+            return (
+              <div
+                key={chat.id}
+                onClick={() => openModal(chat.id)}
+                className="p-4 border rounded cursor-pointer hover:bg-gray-100 flex justify-between items-center"
+              >
+                <div className="flex items-center">
+                  <span>{chatName}</span>
+                  {unreadCount > 0 && (
+                    <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeChat(chat.id);
+                  }}
+                  className="ml-2 px-2 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            );
+          })}
+        </div>
+    
+        {isModalOpen && modalChatId && (
+          <ChatModal
+            chatId={modalChatId}
+            onClose={() => {
+              setIsModalOpen(false);
+              // Fetch chats and unread counts when closing the modal
+              fetchChats();
+              fetchUnreadCounts();
+            }}
+            onMessagesRead={handleMessagesRead}
+            onNewMessage={handleNewMessage}
+          />
+        )}
       </div>
-
-      {isModalOpen && modalChatId && (
-        <ChatModal
-          chatId={modalChatId}
-          onClose={() => {
-            setIsModalOpen(false);
-            // Fetch chats and unread counts when closing the modal
-            fetchChats();
-            fetchUnreadCounts();
-          }}
-          onMessagesRead={handleMessagesRead}
-          onNewMessage={handleNewMessage}
-        />
-      )}
-    </div>
-  );
+    );
 }
 
 export default ChatList;

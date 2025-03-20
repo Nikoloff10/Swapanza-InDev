@@ -209,22 +209,59 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
   // Render a message component with memoization
   const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
-    // DO NOT include any flex or justify classes here - those should only be in the parent wrapper
+    // Don't add flex justify-end/start here, as it's now in the parent wrapper
     const messageStyle = isCurrentUser
       ? 'bg-blue-500 text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words'
       : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words';
     
-    // Get sender's username
-    const senderUsername = chat.participants.find(
+    // Get sender's username and profile image
+    const sender = chat.participants.find(
       (p) => Number(p.id) === Number(msg.sender)
-    )?.username || 'Unknown';
+    );
+    const senderUsername = sender?.username || 'Unknown';
     
     return (
-      <div className={messageStyle}>
-        <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
-        <div className="text-xs mt-1 opacity-75">
-          {isCurrentUser ? 'You' : senderUsername}
+      <div className="flex items-end">
+        {/* Show profile image for other users' messages */}
+        {!isCurrentUser && (
+          <div className="h-6 w-6 rounded-full bg-gray-300 mr-2 flex-shrink-0 overflow-hidden">
+            {sender?.profile_image_url ? (
+              <img 
+                src={sender.profile_image_url}
+                alt={senderUsername}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center">
+                <span className="text-xs">{senderUsername[0]?.toUpperCase()}</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className={messageStyle}>
+          <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+          <div className="text-xs mt-1 opacity-75">
+            {isCurrentUser ? 'You' : senderUsername}
+          </div>
         </div>
+        
+        {/* Show profile image for current user's messages on the right */}
+        {isCurrentUser && (
+          <div className="h-6 w-6 rounded-full bg-gray-300 ml-2 flex-shrink-0 overflow-hidden">
+            {localStorage.getItem('profileImageUrl') ? (
+              <img 
+                src={localStorage.getItem('profileImageUrl')}
+                alt="You"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center">
+                <span className="text-xs">{localStorage.getItem('username')?.[0]?.toUpperCase() || '?'}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   });

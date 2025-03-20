@@ -6,6 +6,7 @@ import ChatList from './components/ChatList';
 import Profile from './components/Profile';
 import Home from './components/Home';
 
+
 // Create a component that scrolls to top on navigation
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -59,13 +60,13 @@ function App() {
           path="/chats"
           element={isAuth ? <ChatList logout={logout} username={username} /> : <Navigate to="/login" replace />}
         />
-        <Route
-          path="/profile"
-          element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />}
+       <Route 
+          path="/profile" 
+          element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />} 
         />
-        <Route
-          path="/profile/:userId"
-          element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />}
+        <Route 
+          path="/profile/:userId" 
+          element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />} 
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

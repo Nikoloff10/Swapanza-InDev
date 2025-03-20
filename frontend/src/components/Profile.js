@@ -54,10 +54,11 @@ function Profile({ logout, username }) {
 
     setUploading(true);
     try {
+      // Remove the Content-Type header and let the browser set it with the boundary
       const response = await axios.post(`/api/profile/${userId}/upload-image/`, formData, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+          // Let axios set the proper Content-Type with boundary
         },
       });
       
@@ -75,7 +76,7 @@ function Profile({ logout, username }) {
   const handleUpdateBio = async () => {
     try {
       const response = await axios.put(
-        `/api/profile/${userId}/`,
+        `/api/profile/${userId}/`,  
         { bio },
         {
           headers: {

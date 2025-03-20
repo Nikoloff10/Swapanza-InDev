@@ -7,8 +7,12 @@ urlpatterns = [
     path('chats/', views.ChatListCreateView.as_view(), name='chat-list-create'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('users/create/', views.UserCreate.as_view(), name='user-create'),
-    path('profile/', views.profile, name='profile'),
-    path('profile/<int:user_id>/', views.user_profile, name='user-profile'),
+
+    path('profile/', views.user_profile, name='user-profile'),
+    path('profile/<int:user_id>/', views.user_profile, name='user-profile-detail'),
+    
+    path('profile/<int:user_id>/upload-image/', views.upload_profile_image, name='upload-profile-image'),
+
     path('users/', views.UserListView.as_view(), name='user-list'),
     path('unread-counts/', views.unread_message_counts, name='unread-counts'),
     path('reset-notifications/', views.reset_notifications, name='reset-notifications'),

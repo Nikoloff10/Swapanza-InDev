@@ -1,16 +1,100 @@
 import logging
+import os
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.views.decorators.csrf import csrf_exempt
+from swapanzaBackend import settings
 from .models import Chat, Message
 from .serializers import ChatSerializer, MessageSerializer, UserSerializer
 from django.contrib.auth import get_user_model
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404, render
 from rest_framework import filters, pagination
 
 User = get_user_model()
+
+# Add this view for profile image upload
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def upload_profile_image(request, user_id):
+    """
+    Upload a profile image
+    """
+    # Only allow users to update their own profile
+    if str(request.user.id) != str(user_id):
+        return Response({"detail": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
+    
+    if 'profile_image' not in request.FILES:
+        return Response({"detail": "No image provided"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    user = request.user
+    image = request.FILES['profile_image']
+    
+    # Create media directories if they don't exist
+    media_path = os.path.join(settings.MEDIA_ROOT, 'profile_images')
+    os.makedirs(media_path, exist_ok=True)
+    
+    # Generate a unique filename to prevent overwriting
+    filename = f"{user.id}_{image.name}"
+    file_path = os.path.join(media_path, filename)
+    
+    # Save the uploaded file
+    with open(file_path, 'wb+') as destination:
+        for chunk in image.chunks():
+            destination.write(chunk)
+    
+    # Set the URL to be served via the MEDIA_URL
+    user.profile_image_url = f"{settings.MEDIA_URL}profile_images/{filename}"
+    user.save()
+    
+    return Response({
+        "profile_image_url": user.profile_image_url,
+        "username": user.username
+    })
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def user_profile(request, user_id=None):
+    """
+    Retrieve or update user profile
+    """
+    if user_id:
+        user = get_object_or_404(User, id=user_id)
+    else:
+        user = request.user
+    
+    # Only allow users to update their own profile
+    if request.method == 'PUT' and str(request.user.id) != str(user_id):
+        return Response({"detail": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        return Response({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email if user == request.user else None,
+            "profile_image_url": user.profile_image_url,
+            "bio": getattr(user, 'bio', ''),
+        })
+    
+    elif request.method == 'PUT':
+        if 'bio' in request.data:
+            user.bio = request.data['bio']
+            user.save()
+        
+        return Response({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "profile_image_url": user.profile_image_url,
+            "bio": user.bio
+        })
+
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -187,31 +271,7 @@ class MessageListCreateView(generics.ListCreateAPIView):
         
         return Response(self.get_serializer(message).data, status=status.HTTP_201_CREATED)
 
-@api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated])
-def user_profile(request, user_id):
-    """Get or update a user's profile"""
-    try:
-        user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-    
-    # Only allow users to update their own profile
-    if request.method == 'PUT' and request.user.id != user_id:
-        return Response({"error": "Cannot edit other users' profiles"}, status=status.HTTP_403_FORBIDDEN)
-    
-    if request.method == 'GET':
-        serializer = UserSerializer(user)
-        return Response(serializer.data)
-    
-    if request.method == 'PUT':
-        # Don't allow updating username or password through this endpoint for security
-        data = request.data.copy()
-        serializer = UserSerializer(user, data=data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

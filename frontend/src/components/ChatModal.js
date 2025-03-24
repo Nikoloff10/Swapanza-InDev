@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import axios from 'axios';
 
 function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
@@ -14,6 +14,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const [currentUserId, setCurrentUserId] = useState(Number(localStorage.getItem('userId') || 0));
   const wsRetryCount = useRef(0);
   const token = localStorage.getItem('token');
+
+  const otherParticipant = useMemo(() => {
+    if (!chat || !chat.participants || !currentUserId) return null;
+    return chat.participants.find(p => Number(p.id) !== Number(currentUserId)) || null;
+  }, [chat, currentUserId]);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -214,7 +219,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       ? 'bg-blue-500 text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words'
       : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words';
     
-    // Get sender's username and profile image
+    // Get sender's username and profile image - FIXED: Always get from chat participants data
     const sender = chat.participants.find(
       (p) => Number(p.id) === Number(msg.sender)
     );
@@ -249,15 +254,16 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         {/* Show profile image for current user's messages on the right */}
         {isCurrentUser && (
           <div className="h-6 w-6 rounded-full bg-gray-300 ml-2 flex-shrink-0 overflow-hidden">
-            {localStorage.getItem('profileImageUrl') ? (
+            {/* FIXED: Use the sender object from chat participants instead of localStorage */}
+            {sender?.profile_image_url ? (
               <img 
-                src={localStorage.getItem('profileImageUrl')}
+                src={sender.profile_image_url}
                 alt="You"
                 className="h-full w-full object-cover"
               />
             ) : (
               <div className="h-full w-full flex items-center justify-center">
-                <span className="text-xs">{localStorage.getItem('username')?.[0]?.toUpperCase() || '?'}</span>
+                <span className="text-xs">{senderUsername[0]?.toUpperCase() || '?'}</span>
               </div>
             )}
           </div>
@@ -274,12 +280,27 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md overflow-hidden flex flex-col">
         <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-xl font-semibold">
-            {chat.participants
-              .filter((p) => Number(p.id) !== Number(currentUserId))
-              .map((p) => p.username)
-              .join(', ')}
-          </h2>
+          <div className="flex items-center">
+            {/* Profile image of other user */}
+            {otherParticipant && (
+              <div className="h-8 w-8 rounded-full bg-gray-300 mr-2 overflow-hidden">
+                {otherParticipant.profile_image_url ? (
+                  <img 
+                    src={otherParticipant.profile_image_url}
+                    alt={otherParticipant.username}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <span className="text-sm">{otherParticipant.username[0]?.toUpperCase()}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            <h2 className="text-xl font-semibold">
+              {otherParticipant ? otherParticipant.username : 'Chat'}
+            </h2>
+          </div>
           <div className="flex items-center">
             <span className="mr-2 text-sm">
               {connectionStatus === 'connected' ? (
@@ -290,12 +311,10 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
                 <span className="text-red-500">●</span>
               )}
             </span>
-            <button
-              onClick={onClose}
-              className="p-1 rounded-full hover:bg-gray-200"
-              aria-label="Close"
-            >
-              X
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
             </button>
           </div>
         </div>

@@ -14,6 +14,7 @@ function ChatList({ logout, username }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [showNotifications, setShowNotifications] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const searchTimeoutRef = useRef(null);
   const navigate = useNavigate();
 
@@ -21,6 +22,23 @@ function ChatList({ logout, username }) {
     navigate('/profile');
   };
   
+  const fetchCurrentUserProfile = useCallback(async () => {
+    if (!token || !currentUserId) return;
+    
+    try {
+      const response = await axios.get(`/api/profile/${currentUserId}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setCurrentUserProfile(response.data);
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    }
+  }, [token, currentUserId]);
+
+  useEffect(() => {
+    fetchCurrentUserProfile();
+  }, [fetchCurrentUserProfile]);
 
   // Get IDs of closed chats from localStorage
   const getClosedChatIds = useCallback(() => {
@@ -330,24 +348,24 @@ function ChatList({ logout, username }) {
     return (
       <div className="max-w-md mx-auto p-4 bg-white rounded shadow">
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center">
+        <div className="flex items-center">
             {/* Profile Picture (circular) */}
             <div 
               className="h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 cursor-pointer overflow-hidden"
               onClick={handleProfileClick}
             >
-              {localStorage.getItem('profileImageUrl') ? (
+              {currentUserProfile?.profile_image_url ? (
                 <img 
-                  src={localStorage.getItem('profileImageUrl')} 
+                  src={currentUserProfile.profile_image_url} 
                   alt={username} 
                   className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="text-lg font-bold">{username ? username[0].toUpperCase() : '?'}</span>
-              )}
-            </div>
-            <h1 className="text-2xl font-bold">Chats</h1>
-          </div>
+            />
+          ) : (
+            <span className="text-lg font-bold">{username ? username[0].toUpperCase() : '?'}</span>
+          )}
+        </div>
+        <h1 className="text-2xl font-bold">Chats</h1>
+      </div>
           
           <div className="flex items-center">
             {/* Profile button */}

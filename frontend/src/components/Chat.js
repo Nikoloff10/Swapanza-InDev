@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
+import React, { useState, useRef, useEffect, memo, useMemo } from 'react';
 
 function Chat({ chat, currentUserId, messages = [], sendMessage }) {
   const [newMessage, setNewMessage] = useState('');
@@ -12,6 +12,19 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
     scrollToBottom();
   }, [messages]);
 
+  // Compute the other participant using useMemo
+  const otherParticipant = useMemo(() => {
+    if (!chat || !chat.participants) return { username: 'Unknown' };
+    
+    // Filter out current user to get other participants
+    const otherParticipants = chat.participants.filter(
+      participant => Number(participant.id) !== Number(currentUserId)
+    );
+    
+    // Use the first other participant or default to unknown
+    return otherParticipants[0] || { username: 'Unknown' };
+  }, [chat, currentUserId]);
+
   if (!chat) {
     return (
       <div className="flex flex-col h-full">
@@ -21,13 +34,6 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
       </div>
     );
   }
-
-  // Filter out current user's entry to get the other participant(s)
-  const otherParticipants = chat.participants.filter(
-    (participant) => Number(participant.id) !== Number(currentUserId)
-  );
-  // Use the first other participant for the chat title.
-  const otherParticipant = otherParticipants[0] || { username: 'Unknown' };
 
   const handleSubmit = (e) => {
     e.preventDefault();

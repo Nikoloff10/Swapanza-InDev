@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import axios from 'axios';
+import SwapanzaModal from './SwapanzaModal';
 
 function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const [chat, setChat] = useState(null);
@@ -15,6 +16,24 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const wsRetryCount = useRef(0);
   const token = localStorage.getItem('token');
 
+  // Swapanza states:
+  const [swapanzaDuration, setSwapanzaDuration] = useState(5);
+  const [showSwapanzaOptions, setShowSwapanzaOptions] = useState(false);
+  const [isSwapanzaRequested, setIsSwapanzaRequested] = useState(false);
+  const [swapanzaRequestedBy, setSwapanzaRequestedBy] = useState(null);
+  const [swapanzaRequestedByUsername, setSwapanzaRequestedByUsername] = useState(null);
+  const [isSwapanzaActive, setIsSwapanzaActive] = useState(false);
+  const [swapanzaEndTime, setSwapanzaEndTime] = useState(null);
+  const [userConfirmedSwapanza, setUserConfirmedSwapanza] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [otherUserConfirmedSwapanza, setOtherUserConfirmedSwapanza] = useState(false);
+  const [showSwapanzaModal, setShowSwapanzaModal] = useState(false);
+  const [remainingMessages, setRemainingMessages] = useState(2);
+  
+  const swapanzaTimeLeftRef = useRef(null);
+  // Track our sent messages that haven't been confirmed by the server yet
+  const pendingMessages = useRef([]);
+
   const otherParticipant = useMemo(() => {
     if (!chat || !chat.participants || !currentUserId) return null;
     return chat.participants.find(p => Number(p.id) !== Number(currentUserId)) || null;
@@ -24,6 +43,40 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Function to reset Swapanza state - define first to avoid circular dependencies
+  const resetSwapanza = useCallback(() => {
+    setIsSwapanzaActive(false);
+    setShowSwapanzaModal(false);
+    setIsSwapanzaRequested(false);
+    setSwapanzaRequestedBy(null);
+    setSwapanzaRequestedByUsername(null);
+    setUserConfirmedSwapanza(false);
+    setOtherUserConfirmedSwapanza(false);
+    setRemainingMessages(2);
+    setSwapanzaEndTime(null);
+    
+    if (swapanzaTimeLeftRef.current) {
+      clearInterval(swapanzaTimeLeftRef.current);
+    }
+  }, []);
+
+  // Function to start Swapanza countdown
+  const startSwapanzaCountdown = useCallback((endTime) => {
+    if (swapanzaTimeLeftRef.current) {
+      clearInterval(swapanzaTimeLeftRef.current);
+    }
+    
+    swapanzaTimeLeftRef.current = setInterval(() => {
+      const now = new Date();
+      const timeLeft = endTime - now;
+      
+      if (timeLeft <= 0) {
+        clearInterval(swapanzaTimeLeftRef.current);
+        resetSwapanza();
+      }
+    }, 1000);
+  }, [resetSwapanza]);
 
   // Set up WebSocket connection to chat
   const setupWebSocket = useCallback(() => {
@@ -57,8 +110,16 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
           console.log('WebSocket message received:', data);
           
           if (data.type === 'chat.message') {
-            // Add new message to the chat
-            const message = data.message;
+            // Extract message from data
+            const message = data.message || 
+              (data.id && data.content && data.sender ? {
+                id: data.id,
+                content: data.content,
+                sender: data.sender,
+                created_at: data.timestamp || data.created_at,
+                during_swapanza: data.during_swapanza,
+              } : null);
+            
             console.log('New message received:', message);
             
             // Make sure message has all required fields
@@ -68,8 +129,41 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
                 if (prevMessages.some(m => m.id === message.id)) {
                   return prevMessages;
                 }
-                return [...prevMessages, message];
+          
+                let updatedMessages = [...prevMessages];
+                
+                // If this is our own message, replace any pending message with the same content
+                if (Number(message.sender) === Number(currentUserId)) {
+                  // Find pending message with matching content to replace
+                  const pendingIndex = updatedMessages.findIndex(
+                    m => m.pending && m.content === message.content
+                  );
+                  
+                  if (pendingIndex !== -1) {
+                    // Replace the pending message with the confirmed one
+                    updatedMessages[pendingIndex] = message;
+                    
+                    // Also remove from pending messages ref
+                    const pendingRefIndex = pendingMessages.current.findIndex(
+                      pm => pm.content === message.content
+                    );
+                    if (pendingRefIndex !== -1) {
+                      pendingMessages.current.splice(pendingRefIndex, 1);
+                    }
+                    
+                    return updatedMessages;
+                  }
+                }
+                
+                // If we didn't find a pending message to replace, just add the new message
+                return [...updatedMessages, message];
               });
+              
+              // Update remaining messages if Swapanza is active
+              if (isSwapanzaActive && message.during_swapanza && 
+                  Number(message.sender) === Number(currentUserId)) {
+                setRemainingMessages(prev => Math.max(0, prev - 1));
+              }
               
               // Call onMessagesRead if it's our own message
               if (Number(message.sender) === Number(currentUserId)) {
@@ -92,6 +186,50 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
               console.log('Calling onMessagesRead callback');
               onMessagesRead();
             }
+          } else if (data.type === 'swapanza.request') {
+            // Handle Swapanza request
+            const isCurrentUserRequest = Number(data.requested_by) === Number(currentUserId);
+            
+            setIsSwapanzaRequested(true);
+            setSwapanzaDuration(data.duration);
+            setSwapanzaRequestedBy(data.requested_by);
+            setSwapanzaRequestedByUsername(data.requested_by_username);
+            
+            // Show modal for recipient only
+            if (!isCurrentUserRequest) {
+              setShowSwapanzaModal(true);
+            }
+          } else if (data.type === 'swapanza.confirm') {
+            // Handle Swapanza confirmation
+            const isCurrentUser = Number(data.user_id) === Number(currentUserId);
+            
+            if (isCurrentUser) {
+              setUserConfirmedSwapanza(true);
+            } else {
+              setOtherUserConfirmedSwapanza(true);
+            }
+          } else if (data.type === 'swapanza.activate') {
+            // Handle Swapanza activation
+            setIsSwapanzaActive(true);
+            setShowSwapanzaModal(false);
+            setIsSwapanzaRequested(false);
+            setUserConfirmedSwapanza(false);
+            setOtherUserConfirmedSwapanza(false);
+            setRemainingMessages(2);  // Reset remaining messages
+            
+            // Store end time
+            const endTime = new Date(data.ends_at);
+            setSwapanzaEndTime(endTime);
+            
+            // Start countdown timer
+            startSwapanzaCountdown(endTime);
+          } else if (data.type === 'swapanza.expire') {
+            // Handle Swapanza expiration
+            resetSwapanza();
+          } else if (data.type === 'error') {
+            // Display error message
+            console.error('Error from server:', data.message);
+            alert(`Error: ${data.message}`);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -126,7 +264,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       console.error('WebSocket setup error:', error);
       setConnectionStatus('error');
     }
-  }, [chatId, token, currentUserId, onMessagesRead, onNewMessage]);
+  }, [chatId, token, currentUserId, onMessagesRead, onNewMessage, isSwapanzaActive, resetSwapanza, startSwapanzaCountdown]);
 
   // Fetch chat details
   const fetchChat = useCallback(async () => {
@@ -139,13 +277,31 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       });
       setChat(response.data);
       setMessages(response.data.messages || []);
+      
+      // Check if chat has active Swapanza
+      if (response.data.swapanza_active) {
+        setIsSwapanzaActive(true);
+        setSwapanzaDuration(response.data.swapanza_duration);
+        
+        // Calculate remaining messages
+        const userMsgCount = response.data.swapanza_message_count?.[currentUserId] || 0;
+        setRemainingMessages(Math.max(0, 2 - userMsgCount));
+        
+        // Set end time and start countdown
+        if (response.data.swapanza_ends_at) {
+          const endTime = new Date(response.data.swapanza_ends_at);
+          setSwapanzaEndTime(endTime);
+          startSwapanzaCountdown(endTime);
+        }
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching chat:', error);
       setError(error.message || 'Failed to fetch chat');
       setLoading(false);
     }
-  }, [chatId, token]);
+  }, [chatId, token, currentUserId, startSwapanzaCountdown]);
 
   useEffect(() => {
     // Find the current user's ID from the chat participants when chat is loaded
@@ -180,6 +336,14 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       if (ws.current) {
         ws.current.close(1000, 'Component unmounted');
       }
+      
+      // Clear any active Swapanza timer
+      if (swapanzaTimeLeftRef.current) {
+        clearInterval(swapanzaTimeLeftRef.current);
+      }
+
+      // Clear pending messages on unmount
+      pendingMessages.current = [];
     };
   }, [chatId, fetchChat, setupWebSocket]);
 
@@ -187,39 +351,115 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // Function to request a Swapanza
+  const requestSwapanza = () => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({
+        type: 'swapanza.request',
+        duration: swapanzaDuration
+      }));
+      
+      setShowSwapanzaOptions(false);
+      setIsSwapanzaRequested(true);
+      setSwapanzaRequestedBy('you');
+    }
+  };
+  
+  // Function to confirm participation in a Swapanza
+  const confirmSwapanza = () => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({
+        type: 'swapanza.confirm'
+      }));
+      
+      setUserConfirmedSwapanza(true);
+    }
+  };
 
   // Handle sending a new message
   const sendMessage = () => {
     if (!newMessage.trim() || connectionStatus !== 'connected') return;
+    
+    // Apply Swapanza restrictions if active
+    if (isSwapanzaActive) {
+      const messageContent = newMessage.trim();
+      
+      // Check character limit and spaces
+      if (messageContent.length > 7) {
+        alert('During Swapanza, messages must be 7 characters or less');
+        return;
+      }
+      
+      if (messageContent.includes(' ')) {
+        alert('During Swapanza, spaces are not allowed in messages');
+        return;
+      }
+      
+      // Check message count
+      if (remainingMessages <= 0) {
+        alert('You have reached your message limit during this Swapanza');
+        return;
+      }
+    }
   
     if (ws.current?.readyState === WebSocket.OPEN) {
-      // Send the message through WebSocket
+      const messageContent = newMessage.trim();
+      
+      // Create a temporary pending message
+      const pendingMsg = {
+        id: `pending-${Date.now()}`,
+        content: messageContent,
+        sender: currentUserId,
+        created_at: new Date().toISOString(),
+        during_swapanza: isSwapanzaActive,
+        pending: true
+      };
+      
+      // Add to pending messages
+      pendingMessages.current.push(pendingMsg);
+      
+      // Add to displayed messages for immediate feedback
+      setMessages(prevMessages => [...prevMessages, pendingMsg]);
+      
+      // Send through WebSocket
       ws.current.send(
         JSON.stringify({
           type: 'chat.message',
-          content: newMessage.trim()
+          content: messageContent
         })
       );
   
       // Clear the input field
       setNewMessage('');
+
+      // If this is a Swapanza message, preemptively decrement count
+      if (isSwapanzaActive) {
+        setRemainingMessages(prev => Math.max(0, prev - 1));
+      }
     } else {
       console.error('WebSocket is not connected');
       setConnectionStatus('error');
     }
   };
 
-  // Track the count of messages by each sender (for styling)
-  
-
   // Render a message component with memoization
   const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
-    // Don't add flex justify-end/start here, as it's now in the parent wrapper
-    const messageStyle = isCurrentUser
-      ? 'bg-blue-500 text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words'
-      : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words';
+    // Check if message was sent during Swapanza
+    const isDuringSwapanza = msg.during_swapanza;
+    const isPending = msg.pending === true;
     
-    // Get sender's username and profile image - FIXED: Always get from chat participants data
+    // Add special styling for Swapanza messages
+    let messageStyle = isCurrentUser
+      ? `${isDuringSwapanza ? 'bg-purple-500' : 'bg-blue-500'} text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words`
+      : `${isDuringSwapanza ? 'bg-purple-200' : 'bg-gray-200'} text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words`;
+    
+    // Add opacity for pending messages
+    if (isPending) {
+      messageStyle += ' opacity-70';
+    }
+    
+    // Get sender's username and profile image
     const sender = chat.participants.find(
       (p) => Number(p.id) === Number(msg.sender)
     );
@@ -246,15 +486,20 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         
         <div className={messageStyle}>
           <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
-          <div className="text-xs mt-1 opacity-75">
-            {isCurrentUser ? 'You' : senderUsername}
+          <div className="text-xs mt-1 opacity-75 flex justify-between">
+            <span>{isCurrentUser ? 'You' : senderUsername}</span>
+            <span>
+              {isPending && <span className="ml-2 text-xs italic">Sending...</span>}
+              {isDuringSwapanza && (
+                <span className="ml-2 text-xs font-bold">Swapanza</span>
+              )}
+            </span>
           </div>
         </div>
         
         {/* Show profile image for current user's messages on the right */}
         {isCurrentUser && (
           <div className="h-6 w-6 rounded-full bg-gray-300 ml-2 flex-shrink-0 overflow-hidden">
-            {/* FIXED: Use the sender object from chat participants instead of localStorage */}
             {sender?.profile_image_url ? (
               <img 
                 src={sender.profile_image_url}
@@ -272,9 +517,98 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     );
   });
 
+  // Render Swapanza section based on state
+  const renderSwapanzaSection = () => {
+    if (isSwapanzaActive) {
+      // Show active Swapanza UI
+      const timeLeft = swapanzaEndTime ? Math.max(0, Math.floor((swapanzaEndTime - new Date()) / 60000)) : 0;
+      
+      return (
+        <div className="p-3 border-t bg-purple-100">
+          <div className="flex justify-between items-center">
+            <span className="text-purple-800 font-medium">Swapanza Active!</span>
+            <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded text-sm">
+              {timeLeft} min left
+            </span>
+          </div>
+          <p className="text-xs text-purple-700 mt-1">
+            {remainingMessages}/2 messages left • Max 7 chars • No spaces
+          </p>
+        </div>
+      );
+    }
+    
+    if (isSwapanzaRequested) {
+      // Show pending Swapanza request
+      return (
+        <div className="p-3 border-t bg-purple-50 text-center">
+          <p className="text-sm text-purple-700">
+            {swapanzaRequestedBy === 'you'
+              ? `Swapanza invitation sent (${swapanzaDuration} min)`
+              : `Swapanza invitation received (${swapanzaDuration} min)`
+            }
+          </p>
+        </div>
+      );
+    }
+    
+    if (showSwapanzaOptions) {
+      // Show Swapanza options form
+      return (
+        <div className="p-3 border-t bg-purple-50">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <label className="mr-2 text-sm">Duration (min):</label>
+              <input
+                type="number"
+                min="1"
+                max="60"
+                value={swapanzaDuration}
+                onChange={(e) => setSwapanzaDuration(Math.max(1, Math.min(60, Number(e.target.value))))}
+                className="w-16 p-1 border rounded text-sm"
+              />
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowSwapanzaOptions(false)}
+                className="px-2 py-1 bg-gray-200 rounded text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={requestSwapanza}
+                className="px-2 py-1 bg-purple-500 text-white rounded text-sm"
+              >
+                Send Invite
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Show Swapanza button
+    return (
+      <div className="flex justify-center py-2 border-t">
+        <button
+          onClick={() => setShowSwapanzaOptions(true)}
+          className="px-4 py-1 bg-purple-500 text-white rounded-full hover:bg-purple-600 text-sm"
+        >
+          Swapanza
+        </button>
+      </div>
+    );
+  };
+
+  // Use the otherUserConfirmedSwapanza state to avoid ESLint warning
+  const bothUsersConfirmed = userConfirmedSwapanza && otherUserConfirmedSwapanza;
+
   if (loading) return <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">Loading...</div>;
   if (error) return <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">Error: {error}</div>;
   if (!chat) return <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">Chat not found</div>;
+
+  // Combine server-returned messages with pending messages for display
+  const allMessages = [...messages];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -319,16 +653,10 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4" style={{ maxHeight: '60vh' }}>
-          {messages.length === 0 ? (
+          {allMessages.length === 0 ? (
             <div className="text-center text-gray-500 my-4">No messages yet</div>
           ) : (
-            messages.map((msg) => {
-              console.log('Message data:', {
-                msgSender: msg.sender,
-                msgSenderId: Number(msg.sender),
-                currentUserId: currentUserId,
-                isCurrentUser: Number(msg.sender) === Number(currentUserId)
-              });
+            allMessages.map((msg) => {
               const isCurrentUser = Number(msg.sender) === Number(currentUserId);
               return (
                 <div 
@@ -346,28 +674,52 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
           )}
           <div ref={messagesEndRef} />
         </div>
+        
+        {/* Swapanza section */}
+        {renderSwapanzaSection()}
+        
+        {/* Display a message when both users confirm */}
+        {bothUsersConfirmed && (
+          <div className="p-2 bg-green-100 text-center text-green-800 text-sm">
+            Both users have confirmed! Starting Swapanza...
+          </div>
+        )}
+        
         <div className="border-t p-2 flex">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Type a message..."
+            placeholder={isSwapanzaActive ? "Max 7 chars, no spaces (2 msgs)" : "Type a message..."}
             className="flex-1 border rounded-l p-2"
           />
           <button
             onClick={sendMessage}
-            disabled={!newMessage.trim() || connectionStatus !== 'connected'}
+            disabled={!newMessage.trim() || connectionStatus !== 'connected' || (isSwapanzaActive && remainingMessages <= 0)}
             className={`px-4 py-2 rounded-r ${
-              !newMessage.trim() || connectionStatus !== 'connected'
+              !newMessage.trim() || connectionStatus !== 'connected' || (isSwapanzaActive && remainingMessages <= 0)
                 ? 'bg-gray-300 text-gray-500'
-                : 'bg-blue-500 text-white'
+                : isSwapanzaActive ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
             }`}
           >
             Send
           </button>
         </div>
       </div>
+      
+      {/* Swapanza Modal */}
+      {showSwapanzaModal && (
+        <SwapanzaModal
+          isOpen={showSwapanzaModal}
+          onClose={() => setShowSwapanzaModal(false)}
+          onConfirm={confirmSwapanza}
+          requestedBy={swapanzaRequestedBy === 'you' ? 'you' : 'other'}
+          requestedByUsername={swapanzaRequestedByUsername}
+          duration={swapanzaDuration}
+          userConfirmed={userConfirmedSwapanza}
+        />
+      )}
     </div>
   );
 }

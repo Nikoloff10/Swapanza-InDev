@@ -15,3 +15,6 @@ daphne>=4.0.0,<5.0.0
 psycopg2-binary>=2.9.0,<3.0.0
 djangorestframework-simplejwt>=5.0.0,<6.0.0
 cloudinary>=1.32.0
+celery>=5.2.0,<6.0.0
+redis>=4.3.0,<5.0.0
+django-celery-beat>=2.4.0,<3.0.0

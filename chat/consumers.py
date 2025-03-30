@@ -42,13 +42,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         data = json.loads(text_data)
         message_type = data.get('type', 'chat.message')
-        
+    
         if message_type == 'chat.message':
             await self.handle_chat_message(data)
         elif message_type == 'swapanza.request':
             duration = data.get('duration', 5)
             await self.handle_swapanza_request(duration)
         elif message_type == 'swapanza.confirm':
+           
             await self.handle_swapanza_confirm()
         elif message_type == 'messages.read':
             await self.handle_messages_read()
@@ -107,31 +108,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
     
-    async def handle_swapanza_confirm(self, data):
+    async def handle_swapanza_confirm(self):
         """Handle confirmation of Swapanza participation"""
-        # Add user to confirmed participants and check if all users confirmed
-        all_confirmed, start_time, end_time = await self.confirm_swapanza()
+        try:
+         # Add user to confirmed participants and check if all users confirmed
+            all_confirmed, start_time, end_time = await self.confirm_swapanza()
         
-        if all_confirmed:
-            # All participants confirmed, activate Swapanza
-            await self.channel_layer.group_send(
-                self.chat_group_name,
-                {
-                    'type': 'swapanza_activate',
-                    'started_at': start_time.isoformat(),
-                    'ends_at': end_time.isoformat()
-                }
-            )
-        else:
-            # Just this user confirmed, notify others
-            await self.channel_layer.group_send(
-                self.chat_group_name,
-                {
-                    'type': 'swapanza_confirm',
-                    'user_id': self.user.id,
-                    'username': self.user.username
-                }
-            )
+            if all_confirmed:
+                # All participants confirmed, activate Swapanza
+                await self.channel_layer.group_send(
+                    self.chat_group_name,
+                    {
+                        'type': 'swapanza_activate',
+                        'started_at': start_time.isoformat() if start_time else None,
+                        'ends_at': end_time.isoformat() if end_time else None
+                    }
+                )
+            else:
+                # Just this user confirmed, notify others
+                await self.channel_layer.group_send(
+                    self.chat_group_name,
+                    {
+                        'type': 'swapanza_confirm',
+                        'user_id': self.user.id,
+                        'username': self.user.username
+                    }
+                )
+        except Exception as e:
+            # Log the error and prevent it from crashing the WebSocket
+            print(f"Error in handle_swapanza_confirm: {str(e)}")
+            # Notify the client about the error
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Error processing Swapanza confirmation'
+            }))
     
     # Add these handler methods for each message type
     async def chat_message(self, event):
@@ -233,30 +243,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def confirm_swapanza(self):
         """Confirm user's participation in Swapanza"""
-        from django.db.models import Q
-        
         chat = Chat.objects.get(id=self.chat_id)
-        
-        # Create a through-table entry to track which users confirmed
-        if not hasattr(chat, 'swapanza_confirmed_users'):
-            setattr(chat, 'swapanza_confirmed_users', set())
-        
-        # Add this user to confirmed set
-        chat.swapanza_confirmed_users.add(self.user.id)
-        
+
+        # Get confirmed users list from database or initialize empty list
+        confirmed_users = chat.swapanza_confirmed_users or []
+    
+        # Add this user to confirmed list if not already there
+        user_id_str = str(self.user.id)
+        if user_id_str not in confirmed_users:
+            confirmed_users.append(user_id_str)
+            chat.swapanza_confirmed_users = confirmed_users
+            chat.save(update_fields=['swapanza_confirmed_users'])
+    
+        # Get all participant IDs
+        all_participants = list(chat.participants.values_list('id', flat=True))
+    
         # Check if all participants confirmed
-        all_participants = set(chat.participants.values_list('id', flat=True))
-        all_confirmed = all_participants.issubset(chat.swapanza_confirmed_users)
-        
+        all_confirmed = all(str(p_id) in confirmed_users for p_id in all_participants)
+    
         # If all confirmed, activate Swapanza
         if all_confirmed:
             now = timezone.now()
             chat.swapanza_active = True
             chat.swapanza_started_at = now
-            chat.swapanza_ends_at = now + timedelta(minutes=chat.swapanza_duration)
+            chat.swapanza_ends_at = now + timedelta(minutes=chat.swapanza_duration or 5)
             chat.swapanza_message_count = {}  # Reset message counts
             chat.save()
-            
+        
             return True, chat.swapanza_started_at, chat.swapanza_ends_at
         else:
             return False, None, None

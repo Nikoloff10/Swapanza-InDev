@@ -24,6 +24,7 @@ class Chat(models.Model):
     swapanza_started_at = models.DateTimeField(null=True, blank=True)
     swapanza_ends_at = models.DateTimeField(null=True, blank=True)
     swapanza_message_count = models.JSONField(default=dict)  # Format: {user_id: message_count}
+    swapanza_confirmed_users = models.JSONField(default=list)
 
     def __str__(self):
         return f"Chat {self.id} between {self.participants.count()} users"

@@ -195,9 +195,19 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
             setSwapanzaRequestedBy(data.requested_by);
             setSwapanzaRequestedByUsername(data.requested_by_username);
             
-            // Show modal for recipient only
-            if (!isCurrentUserRequest) {
-              setShowSwapanzaModal(true);
+            // Show confirmation for both sender and recipient
+            setShowSwapanzaModal(true);
+            
+            // If this user is the sender, auto-confirm their participation
+            if (isCurrentUserRequest) {
+              // Automatically confirm for the sender
+              if (ws.current?.readyState === WebSocket.OPEN) {
+                ws.current.send(JSON.stringify({
+                  type: 'swapanza.confirm'
+                }));
+                
+                setUserConfirmedSwapanza(true);
+              }
             }
           } else if (data.type === 'swapanza.confirm') {
             // Handle Swapanza confirmation
@@ -208,6 +218,19 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
             } else {
               setOtherUserConfirmedSwapanza(true);
             }
+          
+            // Log the confirmation status to help debug
+            console.log('Swapanza confirmation status:', {
+              userConfirmed: isCurrentUser ? true : userConfirmedSwapanza,
+              otherUserConfirmed: isCurrentUser ? otherUserConfirmedSwapanza : true,
+              userId: currentUserId,
+              confirmingUserId: data.user_id
+            });
+            console.log('Swapanza state after confirm:', {
+              userConfirmed: userConfirmedSwapanza, 
+              otherUserConfirmed: otherUserConfirmedSwapanza,
+              bothConfirmed: userConfirmedSwapanza && otherUserConfirmedSwapanza
+            });
           } else if (data.type === 'swapanza.activate') {
             // Handle Swapanza activation
             setIsSwapanzaActive(true);
@@ -258,6 +281,12 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       ws.current.onerror = (e) => {
         console.error('WebSocket error:', e);
         setConnectionStatus('error');
+        // Log details about the error to help debug
+        console.log('WebSocket error details:', {
+          readyState: ws.current?.readyState,
+          chatId,
+          userId: currentUserId
+        });
       };
       
     } catch (error) {
@@ -269,7 +298,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   // Fetch chat details
   const fetchChat = useCallback(async () => {
     if (!chatId || !token) return;
-
+  
     try {
       setLoading(true);
       const response = await axios.get(`/api/chats/${chatId}/`, {
@@ -369,11 +398,20 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   // Function to confirm participation in a Swapanza
   const confirmSwapanza = () => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({
-        type: 'swapanza.confirm'
-      }));
-      
-      setUserConfirmedSwapanza(true);
+      try {
+        console.log('Sending Swapanza confirmation');
+        ws.current.send(JSON.stringify({
+          type: 'swapanza.confirm'
+        }));
+        
+        setUserConfirmedSwapanza(true);
+        console.log('Swapanza confirmation sent and state updated');
+      } catch (error) {
+        console.error('Error sending Swapanza confirmation:', error);
+      }
+    } else {
+      console.error('Cannot send confirmation: WebSocket not connected');
+      alert('Connection issue. Please try again.');
     }
   };
 

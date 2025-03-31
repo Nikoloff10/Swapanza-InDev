@@ -1,3 +1,4 @@
+// Remove the auto-confirmation effect completely
 import React, { useState, useEffect, useRef } from 'react';
 
 function SwapanzaModal({
@@ -38,7 +39,7 @@ function SwapanzaModal({
     };
   }, [isOpen, onClose]);
   
-  // Remove the auto-confirm effect
+  // Removed the auto-confirm effect completely
   
   if (!isOpen) return null;
   
@@ -49,7 +50,7 @@ function SwapanzaModal({
         
         <p className="text-center mb-6">
           {requestedBy === 'you' ? (
-            <>You've sent a Swapanza invitation for <span className="font-semibold">{duration} minutes</span>. Waiting for a response...</>
+            <>You've sent a Swapanza invitation for <span className="font-semibold">{duration} minutes</span>. Please confirm to participate.</>
           ) : (
             <>
               <span className="font-semibold">{requestedByUsername}</span> has invited you to swap profiles for <span className="font-semibold">{duration} minutes</span>!
@@ -63,7 +64,7 @@ function SwapanzaModal({
           </div>
         </div>
         
-        {/* Show confirm button for both sender and recipient */}
+        {/* Always show the confirm button for both sender and recipient */}
         <button
           onClick={onConfirm}
           disabled={userConfirmed}
@@ -73,7 +74,15 @@ function SwapanzaModal({
               : 'bg-purple-600 text-white hover:bg-purple-700'
           }`}
         >
-          {userConfirmed ? 'Confirmed!' : (requestedBy === 'you' ? 'Confirm Invitation' : 'Accept Invitation')}
+          {userConfirmed ? 'Confirmed!' : 'Confirm Participation'}
+        </button>
+        
+        {/* Show cancel button for both users */}
+        <button
+          onClick={onClose}
+          className="w-full mt-2 p-3 rounded-lg bg-gray-300 hover:bg-gray-400"
+        >
+          Cancel
         </button>
         
         {userConfirmed && (

@@ -1,5 +1,6 @@
 import logging
 import os
+from time import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -7,7 +8,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.views.decorators.csrf import csrf_exempt
 import cloudinary.uploader
 from swapanzaBackend import settings
-from .models import Chat, Message
+from .models import Chat, Message, SwapanzaSession
 from .serializers import ChatSerializer, MessageSerializer, UserSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.decorators import api_view, permission_classes, parser_classes
@@ -295,3 +296,33 @@ def reset_notifications(request):
 
 def index(request):
     return render(request, 'index.html')
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_active_swapanza(request):
+    """Get active Swapanza session for the current user"""
+    user = request.user
+    
+    # Check for active session
+    session = SwapanzaSession.objects.filter(
+        user=user,
+        active=True,
+        ends_at__gt=timezone.now()
+    ).first()
+    
+    if not session:
+        return Response({
+            'active': False
+        })
+    
+    return Response({
+        'active': True,
+        'partner_id': session.partner.id,
+        'partner_username': session.partner.username,
+        'partner_profile_image': session.partner.profile_image_url if session.partner.profile_image_url else None,
+        'ends_at': session.ends_at,
+        'duration': round((session.ends_at - session.started_at).total_seconds() / 60),
+        'message_count': session.message_count
+    })

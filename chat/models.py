@@ -72,12 +72,14 @@ class Message(models.Model):
         ordering = ['created_at']
 
 
+
 class SwapanzaSession(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='swapanza_sessions')
     partner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='swapanza_partners')
     started_at = models.DateTimeField(auto_now_add=True)
     ends_at = models.DateTimeField()
     active = models.BooleanField(default=True)
+    message_count = models.IntegerField(default=0)
     
     def __str__(self):
         return f"Swapanza: {self.user.username} as {self.partner.username} until {self.ends_at}"

@@ -48,15 +48,22 @@ function Chat({ chat, currentUserId, messages = [], sendMessage }) {
 
   // Memoize the message rendering
   const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
-    // Don't add flex justify-end/start here, as it's now in the parent wrapper
-    const messageStyle = isCurrentUser
-      ? 'bg-blue-500 text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words'
-      : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words';
-  
-    // Get sender's username
-    const senderUsername = chat.participants.find(
+    
+    const isDuringSwapanza = msg.during_swapanza;
+    const isPending = msg.pending === true;
+
+    let messageStyle = isCurrentUser
+    ? `${isDuringSwapanza ? "bg-purple-500" : "bg-blue-500"} text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words`
+    : `${isDuringSwapanza ? "bg-purple-200" : "bg-gray-200"} text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words`;
+
+    if (isPending) {
+      messageStyle += " opacity-70";
+    }
+    
+    const sender = chat.participants.find(
       (p) => Number(p.id) === Number(msg.sender)
-    )?.username || 'Unknown';
+    );
+    const senderUsername = sender?.username || "Unknown";
   
     return (
       <div className={messageStyle}>

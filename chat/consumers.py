@@ -277,21 +277,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def save_message(self, content, during_swapanza=False):
         """Save a message to the database"""
-        # Existing save_message code with during_swapanza added
         chat = Chat.objects.get(id=self.chat_id)
+    
+        # Determine the actual sender to show to others
+        # During Swapanza, we need to show the swapped profile
+        actual_sender = self.user
+        apparent_sender = self.user
+    
+        if during_swapanza:
+            # Find the other participant in this Swapanza
+            other_participant = chat.participants.exclude(id=self.user.id).first()
+            if other_participant:
+                # Use the other participant as the apparent sender
+                apparent_sender = other_participant
+    
+        # Create and save the message
         message = Message.objects.create(
             chat=chat,
-            sender=self.user,
+            # Always store the real sender in the database for record keeping
+            sender=actual_sender,
+            # But track who should appear as the sender
+            apparent_sender=apparent_sender.id if apparent_sender != actual_sender else None,
             content=content,
             during_swapanza=during_swapanza
         )
-        
+    
+    # Return both the message and who should appear as the sender
         return {
             'id': message.id,
-            'sender': message.sender.id,
+            'sender': apparent_sender.id,  # This is who will appear as the sender
             'content': message.content,
+            'created_at': message.created_at.isoformat(),
             'timestamp': message.timestamp.isoformat(),
-            'during_swapanza': message.during_swapanza
+            'during_swapanza': message.during_swapanza,
+            'sender_username': apparent_sender.username,
         }
     
     @database_sync_to_async

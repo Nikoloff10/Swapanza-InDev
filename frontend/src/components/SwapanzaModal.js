@@ -38,12 +38,7 @@ function SwapanzaModal({
     };
   }, [isOpen, onClose]);
   
-  // If user is the sender, auto-confirm on mount
-  useEffect(() => {
-    if (isOpen && requestedBy === 'you' && !userConfirmed) {
-      onConfirm();
-    }
-  }, [isOpen, requestedBy, userConfirmed, onConfirm]);
+  // Remove the auto-confirm effect
   
   if (!isOpen) return null;
   
@@ -68,25 +63,18 @@ function SwapanzaModal({
           </div>
         </div>
         
-        {requestedBy !== 'you' && (
-          <button
-            onClick={onConfirm}
-            disabled={userConfirmed}
-            className={`w-full p-3 rounded-lg ${
-              userConfirmed 
-                ? 'bg-green-500 text-white cursor-not-allowed' 
-                : 'bg-purple-600 text-white hover:bg-purple-700'
-            }`}
-          >
-            {userConfirmed ? 'Confirmed!' : 'Accept Invitation'}
-          </button>
-        )}
-        
-        {requestedBy === 'you' && (
-          <div className="w-full p-3 rounded-lg bg-green-500 text-white text-center">
-            You've sent this invitation
-          </div>
-        )}
+        {/* Show confirm button for both sender and recipient */}
+        <button
+          onClick={onConfirm}
+          disabled={userConfirmed}
+          className={`w-full p-3 rounded-lg ${
+            userConfirmed 
+              ? 'bg-green-500 text-white cursor-not-allowed' 
+              : 'bg-purple-600 text-white hover:bg-purple-700'
+          }`}
+        >
+          {userConfirmed ? 'Confirmed!' : (requestedBy === 'you' ? 'Confirm Invitation' : 'Accept Invitation')}
+        </button>
         
         {userConfirmed && (
           <p className="text-center text-sm mt-2 text-gray-500">

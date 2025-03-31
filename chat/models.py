@@ -36,16 +36,17 @@ class Chat(models.Model):
         self.swapanza_started_at = None
         self.swapanza_ends_at = None
         self.swapanza_message_count = {}
+        self.swapanza_confirmed_users = []
         self.save()
 
 class Message(models.Model):
     chat = models.ForeignKey(Chat, related_name='messages', on_delete=models.CASCADE)
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
+    apparent_sender = models.IntegerField(null=True, blank=True) 
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     timestamp = models.DateTimeField(default=timezone.now)
     seen = models.BooleanField(default=False)
-
     during_swapanza = models.BooleanField(default=False)
 
     def clean(self):
@@ -69,3 +70,14 @@ class Message(models.Model):
 
     class Meta:
         ordering = ['created_at']
+
+
+class SwapanzaSession(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='swapanza_sessions')
+    partner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='swapanza_partners')
+    started_at = models.DateTimeField(auto_now_add=True)
+    ends_at = models.DateTimeField()
+    active = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"Swapanza: {self.user.username} as {self.partner.username} until {self.ends_at}"

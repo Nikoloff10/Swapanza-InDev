@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import ChatModal from "./ChatModal";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import { FaBell, FaUser } from "react-icons/fa";
 
 function ChatList({ logout, username }) {
@@ -17,19 +17,112 @@ function ChatList({ logout, username }) {
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const searchTimeoutRef = useRef(null);
   const navigate = useNavigate();
+  const [swapanzaInvites, setSwapanzaInvites] = useState([]);
+  const [showSwapanzaInvites, setShowSwapanzaInvites] = useState(false);
+
+  const acceptInvite = async (inviteId) => {
+    try {
+      // First check if user is already in an active Swapanza
+      const checkResponse = await axios.get("/api/can-start-swapanza/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+  
+      if (!checkResponse.data.can_start) {
+        alert(
+          checkResponse.data.reason ||
+            "You cannot accept a Swapanza invitation at this time"
+        );
+        return;
+      }
+  
+      // Find the invite before removing it
+      const invite = swapanzaInvites.find(inv => inv.id === inviteId);
+      if (!invite) {
+        alert("Invitation not found.");
+        return;
+      }
+      
+      // If allowed, proceed with accepting the invitation
+      const response = await axios.post(
+        `/api/swapanza/accept/${inviteId}/`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      
+      // Update localStorage to remove this specific invitation
+      const storedInvites = JSON.parse(localStorage.getItem('swapanzaInvites') || '[]');
+      const updatedInvites = storedInvites.filter(inv => inv.id !== inviteId);
+      localStorage.setItem('swapanzaInvites', JSON.stringify(updatedInvites));
+      
+      // Remove from state
+      setSwapanzaInvites(prev => prev.filter(inv => inv.id !== inviteId));
+      
+      // Determine which chat to open
+      let chatIdToOpen;
+      if (response.data && response.data.chat_id) {
+        chatIdToOpen = response.data.chat_id;
+      } else if (invite.chat_id) {
+        chatIdToOpen = invite.chat_id;
+      } else {
+        alert("Could not determine which chat to open. Please find the chat manually.");
+        setShowSwapanzaInvites(false);
+        return;
+      }
+      
+      // Make sure chat is visible by removing from closed chats if necessary
+      const closedChatIds = getClosedChatIds();
+      if (closedChatIds.includes(chatIdToOpen.toString())) {
+        const newClosedChats = closedChatIds.filter(id => id !== chatIdToOpen.toString());
+        localStorage.setItem('closedChats', JSON.stringify(newClosedChats));
+        
+        // Refresh chats to show the reopened chat
+        fetchChats();
+      }
+      
+      // Open the chat modal
+      openModal(chatIdToOpen);
+      setShowSwapanzaInvites(false);
+      
+      alert("Swapanza invite accepted! Please confirm in the chat to activate Swapanza.");
+    } catch (error) {
+      console.error("Error accepting Swapanza invite:", error);
+      alert("Failed to accept invite. Please try again.");
+    }
+  };
+
+  const declineInvite = async (inviteId) => {
+    try {
+      await axios.post(
+        `/api/swapanza/decline/${inviteId}/`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setSwapanzaInvites((prev) =>
+        prev.filter((invite) => invite.id !== inviteId)
+      );
+      alert("Swapanza invite declined.");
+    } catch (error) {
+      console.error("Error declining Swapanza invite:", error);
+      alert("Failed to decline invite. Please try again.");
+    }
+  };
 
   const handleProfileClick = () => {
-    navigate('/profile');
+    navigate("/profile");
   };
-  
+
   const fetchCurrentUserProfile = useCallback(async () => {
     if (!token || !currentUserId) return;
-    
+
     try {
       const response = await axios.get(`/api/profile/${currentUserId}/`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       setCurrentUserProfile(response.data);
     } catch (error) {
       console.error("Error fetching user profile:", error);
@@ -39,6 +132,35 @@ function ChatList({ logout, username }) {
   useEffect(() => {
     fetchCurrentUserProfile();
   }, [fetchCurrentUserProfile]);
+
+  useEffect(() => {
+    // Load and clean up Swapanza invitations on component mount
+    try {
+      const storedInvites = JSON.parse(localStorage.getItem('swapanzaInvites') || '[]');
+      
+      // Filter out invitations older than 30 minutes
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const validInvites = storedInvites.filter(invite => {
+        if (invite.timestamp) {
+          const inviteTime = new Date(invite.timestamp);
+          return inviteTime > thirtyMinutesAgo;
+        }
+        return false;
+      });
+      
+      // Update localStorage and state
+      if (validInvites.length !== storedInvites.length) {
+        localStorage.setItem('swapanzaInvites', JSON.stringify(validInvites));
+      }
+      
+      if (validInvites.length > 0) {
+        setSwapanzaInvites(validInvites);
+      }
+    } catch (e) {
+      console.error("Error loading Swapanza invites:", e);
+      localStorage.setItem('swapanzaInvites', JSON.stringify([]));
+    }
+  }, []);
 
   // Get IDs of closed chats from localStorage
   const getClosedChatIds = useCallback(() => {
@@ -122,85 +244,94 @@ function ChatList({ logout, username }) {
   }, []);
 
   // Create a chat with a user
-  const createChat = useCallback(async (otherUserId) => {
-    try {
-      console.log('Attempting to create chat with user ID:', otherUserId);
-      
-      // Check for existing chat with this user, including closed ones
-      let existingChat = null;
-      
-      // First check visible chats
-      existingChat = chats.find(chat => 
-        chat.participants.some(participant => 
-          Number(participant.id) === Number(otherUserId)
-        )
-      );
-      
-      // If not found in visible chats, check on the server
-      if (!existingChat) {
-        try {
-          const response = await axios.get(
-            `/api/chats/find-by-user/${otherUserId}/`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          
-          if (response.data && response.data.id) {
-            existingChat = response.data;
-            
-            // Remove from closed chats in localStorage if it was closed
-            const closedChatIds = getClosedChatIds();
-            if (closedChatIds.includes(existingChat.id.toString())) {
-              const updatedClosedChats = closedChatIds.filter(
-                id => id !== existingChat.id.toString()
-              );
-              localStorage.setItem("closedChats", JSON.stringify(updatedClosedChats));
+  const createChat = useCallback(
+    async (otherUserId) => {
+      try {
+        console.log("Attempting to create chat with user ID:", otherUserId);
+
+        // Check for existing chat with this user, including closed ones
+        let existingChat = null;
+
+        // First check visible chats
+        existingChat = chats.find((chat) =>
+          chat.participants.some(
+            (participant) => Number(participant.id) === Number(otherUserId)
+          )
+        );
+
+        // If not found in visible chats, check on the server
+        if (!existingChat) {
+          try {
+            const response = await axios.get(
+              `/api/chats/find-by-user/${otherUserId}/`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (response.data && response.data.id) {
+              existingChat = response.data;
+
+              // Remove from closed chats in localStorage if it was closed
+              const closedChatIds = getClosedChatIds();
+              if (closedChatIds.includes(existingChat.id.toString())) {
+                const updatedClosedChats = closedChatIds.filter(
+                  (id) => id !== existingChat.id.toString()
+                );
+                localStorage.setItem(
+                  "closedChats",
+                  JSON.stringify(updatedClosedChats)
+                );
+              }
+
+              // Add to visible chats if not already there
+              if (!chats.some((chat) => chat.id === existingChat.id)) {
+                setChats((prevChats) => [...prevChats, existingChat]);
+              }
             }
-            
-            // Add to visible chats if not already there
-            if (!chats.some(chat => chat.id === existingChat.id)) {
-              setChats(prevChats => [...prevChats, existingChat]);
-            }
+          } catch (error) {
+            console.log("No existing chat found on server:", error);
           }
-        } catch (error) {
-          console.log('No existing chat found on server:', error);
         }
-      }
-      
-      if (existingChat) {
-        console.log('Chat already exists, opening existing chat:', existingChat.id);
-        
+
+        if (existingChat) {
+          console.log(
+            "Chat already exists, opening existing chat:",
+            existingChat.id
+          );
+
+          // Clear search
+          setSearchQuery("");
+          setSearchResults([]);
+
+          // Open the existing chat
+          openModal(existingChat.id);
+          return;
+        }
+
+        console.log("No existing chat found, creating new chat");
+        // If no existing chat, create a new one
+        const response = await axios.post(
+          "/api/chats/",
+          { participants: [otherUserId] },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        console.log("New chat created:", response.data);
+
+        // Add the new chat to the list and open it
+        setChats((prevChats) => [...prevChats, response.data]);
+
         // Clear search
-        setSearchQuery('');
+        setSearchQuery("");
         setSearchResults([]);
-        
-        // Open the existing chat
-        openModal(existingChat.id);
-        return;
+
+        // Open the chat modal
+        openModal(response.data.id);
+      } catch (error) {
+        console.error("Error creating chat:", error);
       }
-      
-      console.log('No existing chat found, creating new chat');
-      // If no existing chat, create a new one
-      const response = await axios.post(
-        '/api/chats/',
-        { participants: [otherUserId] },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      console.log('New chat created:', response.data);
-      
-      // Add the new chat to the list and open it
-      setChats(prevChats => [...prevChats, response.data]);
-      
-      // Clear search
-      setSearchQuery('');
-      setSearchResults([]);
-      
-      // Open the chat modal
-      openModal(response.data.id);
-    } catch (error) {
-      console.error('Error creating chat:', error);
-    }
-  }, [token, chats, openModal, getClosedChatIds]);
+    },
+    [token, chats, openModal, getClosedChatIds]
+  );
 
   // Handle search input with debounce
   useEffect(() => {
@@ -283,10 +414,10 @@ function ChatList({ logout, username }) {
           JSON.stringify([...closedChatIds, chatId.toString()])
         );
       }
-  
+
       // Remove from UI
       setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId));
-  
+
       // Update unread counts
       setUnreadCounts((prevCounts) => {
         const newCounts = { ...prevCounts };
@@ -345,198 +476,273 @@ function ChatList({ logout, username }) {
   const totalUnreadMessages =
     Object.values(unreadCounts).reduce((sum, count) => sum + count, 0) || 0;
 
-    return (
-      <div className="max-w-md mx-auto p-4 bg-white rounded shadow">
-        <div className="flex justify-between items-center mb-4">
+  return (
+    <div className="max-w-md mx-auto p-4 bg-white rounded shadow">
+      <div className="flex justify-between items-center mb-4">
         <div className="flex items-center">
-            {/* Profile Picture (circular) */}
-            <div 
-              className="h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 cursor-pointer overflow-hidden"
-              onClick={handleProfileClick}
-            >
-              {currentUserProfile?.profile_image_url ? (
-                <img 
-                  src={currentUserProfile.profile_image_url} 
-                  alt={username} 
-                  className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="text-lg font-bold">{username ? username[0].toUpperCase() : '?'}</span>
-          )}
+          {/* Profile Picture (circular) */}
+          <div
+            className="h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 cursor-pointer overflow-hidden"
+            onClick={handleProfileClick}
+          >
+            {currentUserProfile?.profile_image_url ? (
+              <img
+                src={currentUserProfile.profile_image_url}
+                alt={username}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-lg font-bold">
+                {username ? username[0].toUpperCase() : "?"}
+              </span>
+            )}
+          </div>
+          <h1 className="text-2xl font-bold">Chats</h1>
         </div>
-        <h1 className="text-2xl font-bold">Chats</h1>
-      </div>
-          
-          <div className="flex items-center">
-            {/* Profile button */}
-            <button
-              onClick={handleProfileClick}
-              className="mr-3 p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
-              title="View Profile"
-            >
-              <FaUser className="text-blue-600" />
-            </button>
-            
-            {/* Notifications */}
+
+        <div className="flex items-center">
+          {/* Add Swapanza notification indicator */}
+          {swapanzaInvites.length > 0 && (
             <div className="relative mr-4">
               <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
+                onClick={() => setShowSwapanzaInvites(!showSwapanzaInvites)}
+                className="p-2 bg-purple-100 rounded-full hover:bg-purple-200 focus:outline-none relative"
               >
-                <FaBell className="text-blue-600" />
-                {totalUnreadMessages > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {totalUnreadMessages}
-                  </span>
-                )}
+                <span className="text-purple-600">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M20 4h-4V2a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+                    <path d="M2 13h20v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9z" />
+                    <path d="M12 7v13" />
+                    <path d="M8 15l4 4 4-4" />
+                  </svg>
+                </span>
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {swapanzaInvites.length}
+                </span>
               </button>
-    
-              {showNotifications && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
-                  <div className="p-3 border-b border-gray-200 font-medium flex justify-between items-center">
-                    <span>Notifications</span>
-                    <button
-                      onClick={resetAllNotifications}
-                      className="text-xs text-blue-500 hover:text-blue-700"
-                    >
-                      Reset All
-                    </button>
+
+              {showSwapanzaInvites && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
+                  <div className="p-3 border-b border-gray-200 font-medium">
+                    Swapanza Invitations
                   </div>
                   <div className="max-h-60 overflow-y-auto">
-                    {Object.keys(unreadCounts).length > 0 ? (
-                      Object.entries(unreadCounts).map(([chatId, count]) => {
-                        // Find chat info to display name
-                        const chat = chats.find(
-                          (c) => c.id.toString() === chatId
-                        );
-                        const otherUser = chat?.participants?.find(
-                          (p) => Number(p.id) !== Number(currentUserId)
-                        );
-    
-                        return (
-                          <div
-                            key={chatId}
-                            className="p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => {
-                              openModal(Number(chatId));
-                              setShowNotifications(false);
-                            }}
+                    {swapanzaInvites.map((invite) => (
+                      <div
+                        key={invite.id}
+                        className="p-3 border-b border-gray-100"
+                      >
+                        <div className="mb-2">
+                          <span className="font-medium">{invite.from}</span>{" "}
+                          invited you to swap profiles for{" "}
+                          <span className="font-medium">
+                            {invite.duration} min
+                          </span>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => acceptInvite(invite.id)}
+                            className="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600"
                           >
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">
-                                {otherUser?.username || "Unknown"}
-                              </span>
-                              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
-                                {count} {count === 1 ? "message" : "messages"}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => declineInvite(invite.id)}
+                            className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {swapanzaInvites.length === 0 && (
                       <div className="p-4 text-gray-500 text-center">
-                        No new messages
+                        No pending Swapanza invitations
                       </div>
                     )}
                   </div>
                 </div>
               )}
             </div>
-            
-            {/* Logout button */}
-            <button
-              onClick={logout}
-              className="px-3 py-1 bg-red-500 text-white rounded"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-    
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full p-2 border rounded"
-          />
-          {searchResults.length > 0 && (
-            <div className="mt-2 border border-gray-200 rounded shadow">
-              {searchResults.map((user) => (
-                <div
-                  key={user.id}
-                  onClick={() => createChat(user.id)}
-                  className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                >
-                  {user.username}
-                </div>
-              ))}
-            </div>
           )}
-        </div>
-    
-        <div className="mb-4">
+
+          {/* Profile button */}
           <button
-            onClick={closeAllChats}
-            className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            onClick={handleProfileClick}
+            className="mr-3 p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
+            title="View Profile"
           >
-            Close All Chats
+            <FaUser className="text-blue-600" />
           </button>
-        </div>
-    
-        <div className="space-y-2">
-          {chats.map((chat) => {
-            // Find the other participant (assuming 2-person chats)
-            const otherUser = chat.participants.find(
-              (p) => Number(p.id) !== Number(currentUserId)
-            );
-            const chatName = otherUser ? otherUser.username : "Unknown User";
-            const unreadCount = unreadCounts[chat.id] || 0;
-    
-            return (
-              <div
-                key={chat.id}
-                onClick={() => openModal(chat.id)}
-                className="p-4 border rounded cursor-pointer hover:bg-gray-100 flex justify-between items-center"
-              >
-                <div className="flex items-center">
-                  <span>{chatName}</span>
-                  {unreadCount > 0 && (
-                    <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {unreadCount}
-                    </span>
+
+          {/* Notifications */}
+          <div className="relative mr-4">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
+            >
+              <FaBell className="text-blue-600" />
+              {totalUnreadMessages > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {totalUnreadMessages}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
+                <div className="p-3 border-b border-gray-200 font-medium flex justify-between items-center">
+                  <span>Notifications</span>
+                  <button
+                    onClick={resetAllNotifications}
+                    className="text-xs text-blue-500 hover:text-blue-700"
+                  >
+                    Reset All
+                  </button>
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {Object.keys(unreadCounts).length > 0 ? (
+                    Object.entries(unreadCounts).map(([chatId, count]) => {
+                      // Find chat info to display name
+                      const chat = chats.find(
+                        (c) => c.id.toString() === chatId
+                      );
+                      const otherUser = chat?.participants?.find(
+                        (p) => Number(p.id) !== Number(currentUserId)
+                      );
+
+                      return (
+                        <div
+                          key={chatId}
+                          className="p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => {
+                            openModal(Number(chatId));
+                            setShowNotifications(false);
+                          }}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">
+                              {otherUser?.username || "Unknown"}
+                            </span>
+                            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
+                              {count} {count === 1 ? "message" : "messages"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-gray-500 text-center">
+                      No new messages
+                    </div>
                   )}
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeChat(chat.id);
-                  }}
-                  className="ml-2 px-2 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm"
-                >
-                  Close
-                </button>
               </div>
-            );
-          })}
+            )}
+          </div>
+
+          {/* Logout button */}
+          <button
+            onClick={logout}
+            className="px-3 py-1 bg-red-500 text-white rounded"
+          >
+            Logout
+          </button>
         </div>
-    
-        {isModalOpen && modalChatId && (
-          <ChatModal
-            chatId={modalChatId}
-            onClose={() => {
-              setIsModalOpen(false);
-              // Fetch chats and unread counts when closing the modal
-              fetchChats();
-              fetchUnreadCounts();
-            }}
-            onMessagesRead={handleMessagesRead}
-            onNewMessage={handleNewMessage}
-          />
+      </div>
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 border rounded"
+        />
+        {searchResults.length > 0 && (
+          <div className="mt-2 border border-gray-200 rounded shadow">
+            {searchResults.map((user) => (
+              <div
+                key={user.id}
+                onClick={() => createChat(user.id)}
+                className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+              >
+                {user.username}
+              </div>
+            ))}
+          </div>
         )}
       </div>
-    );
+
+      <div className="mb-4">
+        <button
+          onClick={closeAllChats}
+          className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+        >
+          Close All Chats
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {chats.map((chat) => {
+          // Find the other participant (assuming 2-person chats)
+          const otherUser = chat.participants.find(
+            (p) => Number(p.id) !== Number(currentUserId)
+          );
+          const chatName = otherUser ? otherUser.username : "Unknown User";
+          const unreadCount = unreadCounts[chat.id] || 0;
+
+          return (
+            <div
+              key={chat.id}
+              onClick={() => openModal(chat.id)}
+              className="p-4 border rounded cursor-pointer hover:bg-gray-100 flex justify-between items-center"
+            >
+              <div className="flex items-center">
+                <span>{chatName}</span>
+                {unreadCount > 0 && (
+                  <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeChat(chat.id);
+                }}
+                className="ml-2 px-2 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm"
+              >
+                Close
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {isModalOpen && modalChatId && (
+        <ChatModal
+          chatId={modalChatId}
+          onClose={() => {
+            setIsModalOpen(false);
+            // Fetch chats and unread counts when closing the modal
+            fetchChats();
+            fetchUnreadCounts();
+          }}
+          onMessagesRead={handleMessagesRead}
+          onNewMessage={handleNewMessage}
+        />
+      )}
+    </div>
+  );
 }
 
 export default ChatList;

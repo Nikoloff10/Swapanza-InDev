@@ -1,6 +1,7 @@
 import logging
 import os
-from time import timezone
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -243,6 +244,25 @@ class ChatDetailView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(chat)
         return Response(serializer.data)
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        
+        # Add Swapanza information
+        now = timezone.now()
+        swapanza_active = False
+        
+        if instance.swapanza_active and instance.swapanza_ends_at and instance.swapanza_ends_at > now:
+            swapanza_active = True
+            
+        data['swapanza_active'] = swapanza_active
+        if swapanza_active:
+            data['swapanza_ends_at'] = instance.swapanza_ends_at.isoformat() if instance.swapanza_ends_at else None
+            data['swapanza_message_count'] = instance.swapanza_message_count or {}
+            
+        return Response(data)
+
 logger = logging.getLogger(__name__)
 
 class MessageListCreateView(generics.ListCreateAPIView):
@@ -326,3 +346,40 @@ def get_active_swapanza(request):
         'duration': round((session.ends_at - session.started_at).total_seconds() / 60),
         'message_count': session.message_count
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def can_start_swapanza(request):
+    """Check if user can start a new Swapanza"""
+    try:
+        user = request.user
+        now = timezone.now()
+        
+        # Check all possible active Swapanza scenarios
+        has_active_session = SwapanzaSession.objects.filter(
+            Q(user=user) | Q(partner=user),
+            active=True,
+            ends_at__gt=now
+        ).exists()
+        
+        # Also check if the user is in any chat with active Swapanza
+        has_active_chat_swapanza = Chat.objects.filter(
+            participants=user,
+            swapanza_active=True,
+            swapanza_ends_at__gt=now
+        ).exists()
+        
+        can_start = not (has_active_session or has_active_chat_swapanza)
+        
+        return Response({
+            'can_start': can_start,
+            'reason': None if can_start else "You or your partner already have an active Swapanza session"
+        })
+    except Exception as e:
+        import traceback
+        print(f"Error in can_start_swapanza: {str(e)}")
+        print(traceback.format_exc())  # Print full traceback
+        return Response(
+            {'error': f'Could not verify Swapanza availability: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

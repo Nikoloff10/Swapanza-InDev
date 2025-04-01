@@ -76,6 +76,7 @@ class Message(models.Model):
 class SwapanzaSession(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='swapanza_sessions')
     partner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='swapanza_partners')
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name='swapanza_sessions', null=True)
     started_at = models.DateTimeField(auto_now_add=True)
     ends_at = models.DateTimeField()
     active = models.BooleanField(default=True)

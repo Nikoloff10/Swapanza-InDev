@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, memo, useMemo } from 'react';
-
+import MemoizedMessage from './MemoizedMessage';
 function Chat({ chat, currentUserId, messages = [], sendMessage }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);

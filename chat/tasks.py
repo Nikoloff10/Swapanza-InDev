@@ -1,8 +1,9 @@
-from django.utils import timezone
+from celery import shared_task
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from celery import shared_task
-from .models import Chat, SwapanzaSession  # Add SwapanzaSession import
+from django.utils import timezone
+from .models import Chat, SwapanzaSession
+
 
 @shared_task
 def check_expired_swapanzas():
@@ -17,21 +18,20 @@ def check_expired_swapanzas():
     )
     
     session_count = 0
+    affected_users = set()  # Track affected users to send logout notification
+    
     for session in expired_sessions:
         # Mark the session as inactive
         session.active = False
         session.save()
         
-        # Notify user's active connections about expiration
-        async_to_sync(channel_layer.group_send)(
-            f'user_{session.user.id}',
-            {
-                'type': 'swapanza_expire',
-            }
-        )
+        # Add users to affected set
+        affected_users.add(session.user.id)
+        affected_users.add(session.partner.id)
+        
         session_count += 1
     
-    # Also check chat-specific Swapanza (legacy)
+    # Also check chat-specific Swapanza
     expired_chats = Chat.objects.filter(
         swapanza_active=True,
         swapanza_ends_at__lte=now
@@ -50,4 +50,13 @@ def check_expired_swapanzas():
         )
         chat_count += 1
     
-    return f"Reset {session_count} expired Swapanza sessions and {chat_count} chat Swapanzas"
+    # Send logout notifications to all affected users
+    for user_id in affected_users:
+        async_to_sync(channel_layer.group_send)(
+            f'user_{user_id}',
+            {
+                'type': 'swapanza_logout',
+            }
+        )
+    
+    return f"Reset {session_count} expired Swapanza sessions and {chat_count} chat Swapanzas. Sent logout notifications to {len(affected_users)} users."

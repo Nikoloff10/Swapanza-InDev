@@ -163,13 +163,6 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-# Configure Celery Beat for scheduled tasks
-CELERY_BEAT_SCHEDULE = {
-    'check-expired-swapanzas': {
-        'task': 'chat.tasks.check_expired_swapanzas',
-        'schedule': 60.0,  # Run every 60 seconds
-    },
-}
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [

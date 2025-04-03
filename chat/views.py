@@ -185,24 +185,23 @@ class ChatListCreateView(generics.ListCreateAPIView):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def unread_message_counts(request):
-    """
-    Get counts of unread messages for all user's chats
-    """
+    """Get counts of unread messages for all chats"""
     user = request.user
-    
-    # Get all chats the user is part of
     chats = Chat.objects.filter(participants=user)
     
-    # For each chat, count unread messages not sent by this user
     unread_counts = {}
     for chat in chats:
+        # Use read_by instead of seen field
         count = Message.objects.filter(
-            chat=chat, 
-            seen=False
-        ).exclude(sender=user).count()
+            chat=chat
+        ).exclude(
+            read_by=user  # Use the ManyToMany relationship instead of seen field
+        ).exclude(
+            sender=user
+        ).count()
         
         if count > 0:
-            unread_counts[chat.id] = count
+            unread_counts[str(chat.id)] = count
     
     print(f"Unread counts for user {user.username}: {unread_counts}")
     return Response(unread_counts)
@@ -324,62 +323,78 @@ def index(request):
 def get_active_swapanza(request):
     """Get active Swapanza session for the current user"""
     user = request.user
+    now = timezone.now()
     
     # Check for active session
-    session = SwapanzaSession.objects.filter(
+    active_session = SwapanzaSession.objects.filter(
         user=user,
         active=True,
-        ends_at__gt=timezone.now()
+        ends_at__gt=now
     ).first()
     
-    if not session:
+    if not active_session:
         return Response({
             'active': False
         })
     
+    # Get partner information
+    partner = active_session.partner
+    chat = active_session.chat
+    
+    # Count messages sent during this Swapanza IN THE CURRENT CHAT
+    if chat:
+        # Use the chat's message count for this user
+        chat_message_counts = chat.swapanza_message_count or {}
+        message_count = chat_message_counts.get(str(user.id), 0)
+    else:
+        # Fall back to counting all messages
+        message_count = Message.objects.filter(
+            sender=user,
+            during_swapanza=True,
+            created_at__gte=active_session.started_at,
+            created_at__lte=active_session.ends_at
+        ).count()
+    
+    # Update session message count for consistency
+    if message_count != active_session.message_count:
+        active_session.message_count = message_count
+        active_session.save(update_fields=['message_count'])
+    
     return Response({
         'active': True,
-        'partner_id': session.partner.id,
-        'partner_username': session.partner.username,
-        'partner_profile_image': session.partner.profile_image_url if session.partner.profile_image_url else None,
-        'ends_at': session.ends_at,
-        'duration': round((session.ends_at - session.started_at).total_seconds() / 60),
-        'message_count': session.message_count
+        'partner_id': partner.id,
+        'partner_username': partner.username,
+        'partner_profile_image': partner.profile_image_url if hasattr(partner, 'profile_image_url') else None,
+        'ends_at': active_session.ends_at,
+        'started_at': active_session.started_at,
+        'message_count': message_count,
+        'remaining_messages': max(0, 2 - message_count),
+        'chat_id': chat.id if chat else None
     })
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def can_start_swapanza(request):
-    """Check if user can start a new Swapanza"""
-    try:
-        user = request.user
-        now = timezone.now()
-        
-        # Check all possible active Swapanza scenarios
-        has_active_session = SwapanzaSession.objects.filter(
-            Q(user=user) | Q(partner=user),
-            active=True,
-            ends_at__gt=now
-        ).exists()
-        
-        # Also check if the user is in any chat with active Swapanza
-        has_active_chat_swapanza = Chat.objects.filter(
-            participants=user,
-            swapanza_active=True,
-            swapanza_ends_at__gt=now
-        ).exists()
-        
-        can_start = not (has_active_session or has_active_chat_swapanza)
-        
+    """Check if the user can start a Swapanza"""
+    user = request.user
+    now = timezone.now()
+    
+    # Check if user is already in an active Swapanza
+    active_session = SwapanzaSession.objects.filter(
+        user=user,
+        active=True,
+        ends_at__gt=now
+    ).first()
+    
+    if active_session:
         return Response({
-            'can_start': can_start,
-            'reason': None if can_start else "You or your partner already have an active Swapanza session"
+            'can_start': False,
+            'reason': 'You are already in an active Swapanza session'
         })
-    except Exception as e:
-        import traceback
-        print(f"Error in can_start_swapanza: {str(e)}")
-        print(traceback.format_exc())  # Print full traceback
-        return Response(
-            {'error': f'Could not verify Swapanza availability: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    
+    # All checks passed
+    return Response({
+        'can_start': True
+    })
+
+

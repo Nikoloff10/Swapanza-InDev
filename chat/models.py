@@ -18,13 +18,14 @@ class Chat(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Swapanza fields
+    swapanza_requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='swapanza_requests')
+    swapanza_duration = models.IntegerField(default=5, null=True, blank=True)
+    swapanza_confirmed_users = models.JSONField(default=list, null=True, blank=True)
     swapanza_active = models.BooleanField(default=False)
-    swapanza_requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='requested_swaps')
-    swapanza_duration = models.IntegerField(default=5)  # Duration in minutes
     swapanza_started_at = models.DateTimeField(null=True, blank=True)
     swapanza_ends_at = models.DateTimeField(null=True, blank=True)
-    swapanza_message_count = models.JSONField(default=dict)  # Format: {user_id: message_count}
-    swapanza_confirmed_users = models.JSONField(default=list)
+    swapanza_message_count = models.JSONField(default=dict, null=True, blank=True)
+    swapanza_requested_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Chat {self.id} between {self.participants.count()} users"
@@ -40,36 +41,23 @@ class Chat(models.Model):
         self.save()
 
 class Message(models.Model):
-    chat = models.ForeignKey(Chat, related_name='messages', on_delete=models.CASCADE)
-    sender = models.ForeignKey(User, on_delete=models.CASCADE)
-    apparent_sender = models.IntegerField(null=True, blank=True) 
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
-    timestamp = models.DateTimeField(default=timezone.now)
-    seen = models.BooleanField(default=False)
+    read_by = models.ManyToManyField(User, related_name='read_messages', blank=True)
     during_swapanza = models.BooleanField(default=False)
-
-    def clean(self):
-         # Check message constraints during Swapanza
-        if self.chat.swapanza_active:
-            content = self.content.strip()
-            
-            # Check for spaces
-            if ' ' in content:
-                raise ValidationError("During Swapanza, spaces are not allowed in messages")
-                
-            # Check character length
-            if len(content) > 7:
-                raise ValidationError("During Swapanza, messages are limited to 7 characters")
-                
-            # Mark message as sent during Swapanza
-            self.during_swapanza = True
-
-    def __str__(self):
-        return f"Message from {self.sender.username} in Chat {self.chat.id}"
-
+    apparent_sender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='apparent_messages')
+    
     class Meta:
         ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['chat', 'created_at']),
+            models.Index(fields=['sender', 'during_swapanza']),
+        ]
+    
+    def __str__(self):
+        return f"Message {self.id} from {self.sender.username} in chat {self.chat.id}"
 
 
 
@@ -81,6 +69,12 @@ class SwapanzaSession(models.Model):
     ends_at = models.DateTimeField()
     active = models.BooleanField(default=True)
     message_count = models.IntegerField(default=0)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'active']),
+            models.Index(fields=['ends_at']),
+        ]
     
     def __str__(self):
         return f"Swapanza: {self.user.username} as {self.partner.username} until {self.ends_at}"

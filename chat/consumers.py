@@ -1,14 +1,14 @@
 import json
-import traceback
-from django.utils import timezone
-from datetime import timedelta
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import Chat, Message, SwapanzaSession
-from django.contrib.auth import get_user_model
+from django.utils import timezone
 from django.db import transaction
-
-User = get_user_model()
+from django.core.exceptions import ValidationError
+from .models import Chat, Message, SwapanzaSession
+from django.contrib.auth.models import User
+from rest_framework_simplejwt.tokens import AccessToken
+from django.db.models import Q
+import asyncio
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -20,7 +20,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # If user is None or not authenticated, close the connection
         if not self.user or not self.user.is_authenticated:
             print(f"Rejecting WebSocket connection - User is not authenticated")
-            await self.close(code=4001)  # Custom close code for authentication failure
+            await self.close(code=4001)
             return
 
         # Join room group
@@ -28,340 +28,558 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.chat_group_name,
             self.channel_name
         )
-    
+
         # Mark messages as seen when connecting to chat
-        await self.mark_messages_as_seen_async()
+        updated_count = await self.mark_messages_as_seen_async()
     
-        # FIRST, ACCEPT the connection before sending anything
+        # FIRST, ACCEPT the connection before sending anything else
         await self.accept()
+
+        # If messages were marked as read, notify other users
+        if updated_count > 0:
+            await self.channel_layer.group_send(
+                self.chat_group_name,
+                {
+                    'type': 'messages_read',
+                    'user_id': self.user.id
+                }
+            )
+
+        # Check for global Swapanza state and send to client
+        global_state = await self.get_global_swapanza_state()
+        if global_state['active']:
+            partner = global_state['partner']
+            await self.send(text_data=json.dumps({
+                'type': 'swapanza.activate',
+                'started_at': global_state['started_at'].isoformat(),
+                'ends_at': global_state['ends_at'].isoformat(),
+                'partner_id': partner.id,
+                'partner_username': partner.username,
+                'partner_profile_image': partner.profile_image_url if hasattr(partner, 'profile_image_url') else None,
+                'message_count': global_state['message_count'],
+                'remaining_messages': global_state['remaining_messages']
+            }))
     
-        # THEN check if there's an active Swapanza
+        # Also check chat-specific Swapanza
         await self.check_active_swapanza()
 
     async def disconnect(self, close_code):
-        """Disconnect from WebSocket"""
         # Leave room group
         await self.channel_layer.group_discard(
             self.chat_group_name,
             self.channel_name
         )
 
+    # Receive message from WebSocket
     async def receive(self, text_data):
-        """Receive message from WebSocket"""
         try:
             data = json.loads(text_data)
-            message_type = data.get('type', 'chat.message')
+            print(f"Received WebSocket message: {data}")
+            message_type = data.get('type', '')
 
             if message_type == 'chat.message':
-                await self.handle_chat_message(data)
+                content = data.get('content', '').strip()
+                if not content:
+                    return
+                
+                # Save message and get response data
+                message_data = await self.save_chat_message(content)
+                
+                # Check if there was an error in message validation
+                if message_data.get('error'):
+                    # Send error back to the client
+                    await self.send(text_data=json.dumps({
+                        'type': 'chat.message.error',
+                        'message': message_data['message'],
+                        'content': message_data['content']
+                    }))
+                    return
+                
+                # Send message to room group
+                await self.channel_layer.group_send(
+                    self.chat_group_name,
+                    {
+                        'type': 'chat_message',
+                        'message': message_data
+                    }
+                )
+            
             elif message_type == 'swapanza.request':
                 duration = data.get('duration', 5)
-                await self.handle_swapanza_request(duration)
+                success, message = await self.create_swapanza_request(duration)
+                
+                if not success:
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'message': message
+                    }))
+                    return
+                
+                # Broadcast the request to all users in the chat
+                await self.channel_layer.group_send(
+                    self.chat_group_name,
+                    {
+                        'type': 'swapanza_request',
+                        'requested_by': self.user.id,
+                        'requested_by_username': self.user.username,
+                        'duration': duration
+                    }
+                )
+            
             elif message_type == 'swapanza.confirm':
-                await self.handle_swapanza_confirm()
-            elif message_type == 'swapanza.activate_request':
-                await self.handle_swapanza_activate_request()
-            elif message_type == 'messages.read':
-                await self.handle_messages_read()
+                success, message, all_confirmed = await self.confirm_swapanza()
+                
+                if not success:
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'message': message
+                    }))
+                    return
+                
+                # Broadcast confirmation to all users in the chat
+                await self.channel_layer.group_send(
+                    self.chat_group_name,
+                    {
+                        'type': 'swapanza_confirm',
+                        'user_id': self.user.id,
+                        'username': self.user.username,
+                        'all_confirmed': all_confirmed
+                    }
+                )
+                
+                # If all users confirmed, activate the Swapanza after a short delay
+                if all_confirmed:
+                    await asyncio.sleep(2)  # Give clients time to display confirmation
+                    success, message, data = await self.activate_swapanza()
+                    
+                    if success:
+                        await self.channel_layer.group_send(
+                            self.chat_group_name,
+                            {
+                                'type': 'swapanza_activate',
+                                'started_at': data['started_at'].isoformat(),
+                                'ends_at': data['ends_at'].isoformat(),
+                                'partner_id': data['partner_id'],
+                                'partner_username': data['partner_username'],
+                                'partner_profile_image': data.get('partner_profile_image')
+                            }
+                        )
+                    else:
+                        await self.send(text_data=json.dumps({
+                            'type': 'error',
+                            'message': message
+                        }))
+        
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Invalid JSON'
+            }))
         except Exception as e:
+            import traceback
             print(f"Error processing message: {str(e)}")
-            print(traceback.format_exc())  # Full traceback for debugging
+            print(traceback.format_exc())
             await self.send(text_data=json.dumps({
                 'type': 'error',
-                'message': f"Error processing message: {str(e)}"
+                'message': 'Server error: ' + str(e)
             }))
 
-    async def handle_chat_message(self, data):
-        """Handle a chat message from the client"""
-        content = data.get('content', '').strip()
-        if not content:
-            return
-        
-        # Validate message against Swapanza rules
-        is_valid, error_message = await self.validate_swapanza_message(content)
-        if not is_valid:
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': error_message
-            }))
-            return
-        
-        # Save the message
-        message = await self.save_chat_message(content)
+    # Get the user's global Swapanza state
+    @database_sync_to_async
+    def get_global_swapanza_state(self):
+        """Get the user's global Swapanza state across all chats"""
+        user = self.user
+        now = timezone.now()
+        chat_id = self.chat_id
     
-        # Update Swapanza message count if needed
-        remaining_messages = None
-        if message.during_swapanza:
-            count = await self.increment_swapanza_message_count()
-            remaining_messages = 2 - count  # Max 2 messages allowed
-        
-        # Broadcast the message to the group
-        await self.channel_layer.group_send(
-            self.chat_group_name,
-            {
-                'type': 'chat_message',
-                'message': {
-                    'id': message.id,
-                    'content': message.content,
-                    'sender': message.sender.id,
-                    'timestamp': message.timestamp.isoformat(),
-                    'during_swapanza': message.during_swapanza,
-                    'remaining_messages': remaining_messages
-                }
-            }
-        )
+        # Check for active Swapanza session
+        active_session = SwapanzaSession.objects.filter(
+            user=user,
+            active=True,
+            ends_at__gt=now
+        ).first()
+    
+        if not active_session:
+            return {'active': False}
+    
+        # Get message count for the current chat only
+        # If session is tied to a chat, use that chat's message count
+        if active_session.chat:
+            chat = active_session.chat
+            chat_message_counts = chat.swapanza_message_count or {}
+            message_count = chat_message_counts.get(str(user.id), 0)
+        else:
+            # If no chat is associated, count messages in the current chat
+            message_count = Message.objects.filter(
+                sender=user,
+                chat_id=chat_id,
+                during_swapanza=True,
+                created_at__gte=active_session.started_at
+            ).count()
+    
+        return {
+            'active': True,
+            'partner': active_session.partner,
+            'started_at': active_session.started_at,
+            'ends_at': active_session.ends_at,
+            'message_count': message_count,
+            'remaining_messages': max(0, 2 - message_count),
+            'chat_id': active_session.chat.id if active_session.chat else None
+        }
 
+    # Save message to database
+    @database_sync_to_async
+    def save_chat_message(self, content):
+        """Save a chat message to the database with Swapanza validation"""
+        user = self.user
+        chat = Chat.objects.get(id=self.chat_id)
+        now = timezone.now()
+    
+        # Check for active Swapanza session
+        active_session = SwapanzaSession.objects.filter(
+            user=user,
+            active=True,
+            ends_at__gt=now
+        ).first()
+    
+        # Set during_swapanza based on global session
+        during_swapanza = active_session is not None
+    
+        # Perform Swapanza validations if needed
+        if during_swapanza:
+            # Check message length
+            if len(content) > 7:
+                return {
+                    'error': True,
+                    'message': "During Swapanza, messages must be 7 characters or less",
+                    'content': content
+                }
+        
+            # Check for spaces
+            if ' ' in content:
+                return {
+                    'error': True,
+                    'message': "During Swapanza, spaces are not allowed in messages",
+                    'content': content
+                }
+        
+            # Check message count - ONLY COUNT MESSAGES IN THE CURRENT CHAT
+            message_count = Message.objects.filter(
+                sender=user,
+                chat=chat,  # Add this to filter by current chat
+                during_swapanza=True,
+                created_at__gte=active_session.started_at
+            ).count()
+        
+            if message_count >= 2:
+                return {
+                    'error': True,
+                    'message': "You have reached your message limit for this Swapanza chat",
+                    'content': content
+                }
+        
+            # Set the apparent_sender to the partner during Swapanza
+            apparent_sender = active_session.partner
+        else:
+            apparent_sender = None
+    
+        # Create and save the message
+        message = Message.objects.create(
+            sender=user,
+            chat=chat,
+            content=content,
+            during_swapanza=during_swapanza,
+            apparent_sender=apparent_sender
+        )
+    
+        # Update message counts for Swapanza if needed
+        remaining_messages = None
+        if during_swapanza:
+            # Update session message count
+            message_count += 1
+        
+            # Update the current chat's message count
+            chat_message_counts = chat.swapanza_message_count or {}
+            user_id_str = str(user.id)
+            chat_message_counts[user_id_str] = chat_message_counts.get(user_id_str, 0) + 1
+            chat.swapanza_message_count = chat_message_counts
+            chat.save(update_fields=['swapanza_message_count'])
+        
+            # Calculate remaining messages in THIS chat
+            remaining_messages = max(0, 2 - chat_message_counts.get(user_id_str, 0))
+    
+        return {
+            'id': message.id,
+            'sender': user.id,
+            'content': content,
+            'created_at': message.created_at.isoformat(),
+            'during_swapanza': during_swapanza,
+            'apparent_sender': apparent_sender.id if apparent_sender else None,
+            'remaining_messages': remaining_messages
+        }
+
+    # Check if chat has active Swapanza
+    @database_sync_to_async
+    def check_active_swapanza(self):
+        """Check if the current chat has an active Swapanza and notify client"""
+        chat = Chat.objects.get(id=self.chat_id)
+        now = timezone.now()
+        
+        if chat.swapanza_active and chat.swapanza_ends_at and chat.swapanza_ends_at > now:
+            # Find the other participant
+            participants = list(chat.participants.all())
+            if len(participants) < 2:
+                return
+            
+            other_participant = None
+            for p in participants:
+                if p.id != self.user.id:
+                    other_participant = p
+                    break
+            
+            if not other_participant:
+                return
+            
+            # Send current Swapanza state to the client
+            return self.send(text_data=json.dumps({
+                'type': 'swapanza.activate',
+                'started_at': chat.swapanza_started_at.isoformat(),
+                'ends_at': chat.swapanza_ends_at.isoformat(),
+                'partner_id': other_participant.id,
+                'partner_username': other_participant.username,
+                'partner_profile_image': other_participant.profile_image_url if hasattr(other_participant, 'profile_image_url') else None
+            }))
+
+    # Create a Swapanza request
+    @database_sync_to_async
+    def create_swapanza_request(self, duration):
+        """Create a Swapanza request for the current chat"""
+        try:
+            chat = Chat.objects.get(id=self.chat_id)
+    
+            # Check if Swapanza is already active in this chat
+            if chat.swapanza_active and chat.swapanza_ends_at and chat.swapanza_ends_at > timezone.now():
+                return False, "A Swapanza is already active in this chat"
+    
+            # Check if there's a pending request
+            if chat.swapanza_requested_by:
+                # If the request is older than 2 minutes, consider it stale and reset it
+                if chat.swapanza_requested_at:
+                    two_minutes_ago = timezone.now() - timezone.timedelta(minutes=2)
+                    if chat.swapanza_requested_at < two_minutes_ago:
+                        print(f"Clearing stale Swapanza request from {chat.swapanza_requested_by.username}")
+                        chat.swapanza_requested_by = None
+                        chat.swapanza_confirmed_users = []
+                        # Continue with the new request
+                    else:
+                        return False, "A Swapanza request is already pending"
+                else:
+                    # If there's no timestamp, it's likely an old request (pre-feature)
+                    # Go ahead and reset it
+                    chat.swapanza_requested_by = None
+                    chat.swapanza_confirmed_users = []
+    
+            # Check if any participants have active Swapanza elsewhere
+            participants = list(chat.participants.all())
+            active_sessions = SwapanzaSession.objects.filter(
+                user__in=participants,
+                active=True,
+                ends_at__gt=timezone.now()
+            )
+    
+            if active_sessions.exists():
+                # Get users with active sessions
+                active_users = set(active_sessions.values_list('user__username', flat=True))
+                users_str = ", ".join(active_users)
+                return False, f"Cannot start Swapanza: {users_str} already have active Swapanza sessions"
+    
+            # Create request - Use self.user (User instance) instead of self.user.id
+            chat.swapanza_requested_by = self.user  # Use User instance
+            chat.swapanza_duration = duration
+            chat.swapanza_confirmed_users = []  # Reset confirmed users
+            chat.swapanza_requested_at = timezone.now()  # Add timestamp
+            chat.save(update_fields=[
+                'swapanza_requested_by', 
+                'swapanza_duration', 
+                'swapanza_confirmed_users',
+                'swapanza_requested_at'
+            ])
+    
+            return True, None
+        except Exception as e:
+            print(f"Error creating Swapanza request: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return False, str(e)
+
+    # Confirm participation in a Swapanza
+    @database_sync_to_async
+    def confirm_swapanza(self):
+        """Confirm user's participation in a Swapanza"""
+        try:
+            chat = Chat.objects.get(id=self.chat_id)
+            
+            # Check if Swapanza request exists
+            if not chat.swapanza_requested_by:
+                return False, "No Swapanza request exists", False
+            
+            # Check if Swapanza is already active
+            if chat.swapanza_active:
+                return False, "Swapanza is already active", False
+            
+            # Get confirmed users list
+            confirmed_users = chat.swapanza_confirmed_users or []
+            
+            # Check if user already confirmed
+            if str(self.user.id) in confirmed_users:
+                return True, "Already confirmed", False
+            
+            # Add user to confirmed users
+            confirmed_users.append(str(self.user.id))
+            chat.swapanza_confirmed_users = confirmed_users
+            chat.save(update_fields=['swapanza_confirmed_users'])
+            
+            # Check if all participants have confirmed
+            participants = list(chat.participants.all())
+            all_confirmed = len(confirmed_users) == len(participants)
+            
+            return True, "Confirmation successful", all_confirmed
+        except Exception as e:
+            print(f"Error confirming Swapanza: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return False, str(e), False
+
+    # Activate Swapanza
+    @database_sync_to_async
+    def activate_swapanza(self):
+        """Activate Swapanza after all participants have confirmed"""
+        try:
+            with transaction.atomic():
+                chat = Chat.objects.get(id=self.chat_id)
+                
+                # Check if Swapanza request exists
+                if not chat.swapanza_requested_by:
+                    return False, "No Swapanza request exists", None
+                
+                # Check if all participants have confirmed
+                participants = list(chat.participants.all())
+                confirmed_users = chat.swapanza_confirmed_users or []
+                if len(confirmed_users) != len(participants):
+                    return False, "Not all participants have confirmed", None
+                
+                # Set Swapanza duration
+                duration = chat.swapanza_duration or 5
+                start_time = timezone.now()
+                end_time = start_time + timezone.timedelta(minutes=duration)
+                
+                # Update chat with Swapanza state
+                chat.swapanza_active = True
+                chat.swapanza_started_at = start_time
+                chat.swapanza_ends_at = end_time
+                chat.swapanza_message_count = {}  # Reset message count
+                chat.save(update_fields=[
+                    'swapanza_active', 
+                    'swapanza_started_at', 
+                    'swapanza_ends_at', 
+                    'swapanza_message_count'
+                ])
+                
+                # Create Swapanza sessions for all participants
+                created_sessions = []
+                for i, user1 in enumerate(participants):
+                    for j, user2 in enumerate(participants):
+                        if i != j:  # Don't create a session for a user with themselves
+                            # Deactivate any existing active sessions
+                            SwapanzaSession.objects.filter(
+                                user=user1,
+                                active=True
+                            ).update(active=False)
+                            
+                            # Create new session
+                            session = SwapanzaSession.objects.create(
+                                user=user1,
+                                partner=user2,
+                                chat=chat,
+                                started_at=start_time,
+                                ends_at=end_time,
+                                active=True
+                            )
+                            created_sessions.append(session)
+                
+                # Get info for the current user's partner
+                current_user_session = next(
+                    (s for s in created_sessions if s.user.id == self.user.id), 
+                    None
+                )
+                
+                if not current_user_session:
+                    return False, "Could not create Swapanza session for current user", None
+                
+                partner = current_user_session.partner
+                
+                return True, "Swapanza activated successfully", {
+                    'started_at': start_time,
+                    'ends_at': end_time,
+                    'partner_id': partner.id,
+                    'partner_username': partner.username,
+                    'partner_profile_image': partner.profile_image_url if hasattr(partner, 'profile_image_url') else None
+                }
+        except Exception as e:
+            print(f"Error activating Swapanza: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return False, str(e), None
+
+    
+    
     async def chat_message(self, event):
         """Send chat message to WebSocket"""
-        message_data = event['message']
-    
-        # If this is a Swapanza message and the user is the sender, include remaining count
-        remaining_messages = None
-        if message_data.get('during_swapanza') and str(message_data.get('sender')) == str(self.user.id):
-            # Get the current user's remaining message count
-            chat = await database_sync_to_async(Chat.objects.get)(id=self.chat_id)
-            message_counts = chat.swapanza_message_count or {}
-            user_count = message_counts.get(str(self.user.id), 0)
-            remaining_messages = 2 - user_count  # Max 2 messages allowed
-    
+        message = event['message']
+        
         await self.send(text_data=json.dumps({
             'type': 'chat.message',
-            'message': message_data,
-            'remaining_messages': remaining_messages
+            **message
         }))
-
+    
     async def messages_read(self, event):
-        """Send messages read notification to WebSocket"""
+        """Notify WebSocket that messages have been read"""
         await self.send(text_data=json.dumps({
             'type': 'chat.messages_read',
             'user_id': event['user_id']
         }))
-
-    async def handle_messages_read(self):
-        """Handle read messages notification"""
-        await self.mark_messages_as_seen_async()
-        
-        # Notify other users that messages have been read
-        await self.channel_layer.group_send(
-            self.chat_group_name,
-            {
-                'type': 'messages_read',
-                'user_id': self.user.id
-            }
-        )
-
-    async def handle_swapanza_request(self, duration):
-        """Handle a request to start Swapanza"""
-        print(f"User {self.user.username} (ID: {self.user.id}) requesting Swapanza in chat {self.chat_id} for {duration} minutes")
-        
-        # Validate that the user can start a Swapanza
-        can_start, reason = await self.can_start_swapanza()
-        if not can_start:
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': reason or "You or your partner already have an active Swapanza"
-            }))
-            return
-            
-        # Update chat with request info
-        await self.update_chat_with_swapanza_request(duration)
-        
-        # Notify participants
-        await self.channel_layer.group_send(
-            self.chat_group_name,
-            {
-                'type': 'swapanza_request',
-                'duration': duration,
-                'requested_by': self.user.id,
-                'requested_by_username': self.user.username
-            }
-        )
-        
-        print(f"Swapanza request sent by {self.user.username} (ID: {self.user.id}) in chat {self.chat_id}")
-
+    
     async def swapanza_request(self, event):
-        """Send Swapanza request notification to WebSocket"""
+        """Send Swapanza request to WebSocket"""
         await self.send(text_data=json.dumps({
             'type': 'swapanza.request',
-            'duration': event['duration'],
             'requested_by': event['requested_by'],
-            'requested_by_username': event['requested_by_username']
+            'requested_by_username': event['requested_by_username'],
+            'duration': event['duration']
         }))
     
-    async def handle_swapanza_confirm(self):
-        """Handle confirmation of Swapanza participation"""
-        try:
-            print(f"User {self.user.username} (ID: {self.user.id}) confirming Swapanza in chat {self.chat_id}")
-            
-            # Check if user can participate
-            can_start, reason = await self.can_start_swapanza()
-            if not can_start:
-                await self.send(text_data=json.dumps({
-                    'type': 'error',
-                    'message': reason or "Cannot join Swapanza - you already have an active session"
-                }))
-                return
-                
-            # Add user to confirmed list and check if all confirmed
-            all_confirmed, confirmed_users, total_participants = await self.add_swapanza_confirmation()
-            
-            print(f"Swapanza confirmation in chat {self.chat_id}: {len(confirmed_users)}/{total_participants} users confirmed")
-            print(f"Confirmed users: {confirmed_users}")
-            
-            # Notify about confirmation
-            await self.channel_layer.group_send(
-                self.chat_group_name,
-                {
-                    'type': 'swapanza_confirm',
-                    'user_id': self.user.id,
-                    'username': self.user.username,
-                    'all_confirmed': all_confirmed
-                }
-            )
-            
-            # If all confirmed, activate immediately from server side only
-            if all_confirmed:
-                print(f"All users confirmed in chat {self.chat_id}, activating Swapanza...")
-                await self.activate_swapanza()
-        except Exception as e:
-            print(f"Error in handle_swapanza_confirm: {str(e)}")
-            print(traceback.format_exc())  # Full traceback for debugging
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': f'Error processing Swapanza confirmation: {str(e)}'
-            }))
-
     async def swapanza_confirm(self, event):
-        """Send Swapanza confirmation notification to WebSocket"""
+        """Send Swapanza confirmation to WebSocket"""
         await self.send(text_data=json.dumps({
             'type': 'swapanza.confirm',
             'user_id': event['user_id'],
             'username': event['username'],
-            'all_confirmed': event.get('all_confirmed', False)
+            'all_confirmed': event['all_confirmed']
         }))
     
-    async def handle_swapanza_activate_request(self):
-        """Force activation if client detects both confirmed"""
-        print(f"Received activation request from user {self.user.id} in chat {self.chat_id}")
-        
-        # Double-check if all users have confirmed with a fresh database read
-        chat = await database_sync_to_async(Chat.objects.get)(id=self.chat_id)
-        participants = await database_sync_to_async(lambda: list(chat.participants.values_list('id', flat=True)))()
-        confirmed_users = chat.swapanza_confirmed_users or []
-        
-        all_confirmed = all(str(uid) in confirmed_users for uid in participants)
-        
-        print(f"Activation request verification: {len(confirmed_users)}/{len(participants)} confirmed")
-        print(f"All confirmed: {all_confirmed}")
-        
-        if all_confirmed:
-            await self.activate_swapanza()
-        else:
-            # Check if we need to wait for the user's own confirmation
-            user_confirmed = str(self.user.id) in confirmed_users
-            if not user_confirmed:
-                # Add this user to confirmed users first
-                all_confirmed, confirmed_users, total_participants = await self.add_swapanza_confirmation()
-                
-                # Now check again if all users are confirmed
-                if all_confirmed:
-                    await self.activate_swapanza()
-                    return
-            
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': "Cannot activate Swapanza - not all users have confirmed"
-            }))
-    
-    async def activate_swapanza(self):
-        """Activate Swapanza when all users are confirmed"""
-        # Get chat details
-        chat = await database_sync_to_async(Chat.objects.get)(id=self.chat_id)
-        now = timezone.now()
-        duration = chat.swapanza_duration or 5
-        end_time = now + timedelta(minutes=duration)
-        
-        print(f"Attempting to activate Swapanza in chat {self.chat_id} for {duration} minutes")
-        print(f"Start time: {now.isoformat()}, End time: {end_time.isoformat()}")
-        
-        # Create sessions in a transaction
-        success, error_message = await self.create_swapanza_sessions(now, end_time)
-        
-        if success:
-            print(f"Successfully activated Swapanza in chat {self.chat_id}")
-            # Notify all participants
-            await self.channel_layer.group_send(
-                self.chat_group_name,
-                {
-                    'type': 'swapanza_activate',
-                    'started_at': now.isoformat(),
-                    'ends_at': end_time.isoformat()
-                }
-            )
-            
-            # Schedule expiration message
-            self.schedule_swapanza_expiration(end_time)
-        else:
-            print(f"Failed to activate Swapanza in chat {self.chat_id}: {error_message}")
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': error_message or "Failed to create Swapanza sessions"
-            }))
-    
-    def schedule_swapanza_expiration(self, end_time):
-        """Schedule a task to send expiration message when Swapanza ends"""
-        from asgiref.sync import async_to_sync
-        from channels.layers import get_channel_layer
-        import asyncio
-        
-        async def send_expiration():
-            seconds_until_expiry = (end_time - timezone.now()).total_seconds()
-            if seconds_until_expiry > 0:
-                await asyncio.sleep(seconds_until_expiry)
-                
-                # Send expiration message to the group
-                channel_layer = get_channel_layer()
-                await channel_layer.group_send(
-                    self.chat_group_name,
-                    {
-                        'type': 'swapanza_expire'
-                    }
-                )
-                print(f"Sent Swapanza expiration message to chat {self.chat_id}")
-        
-        # Start the task
-        asyncio.create_task(send_expiration())
-        print(f"Scheduled Swapanza expiration for chat {self.chat_id} at {end_time.isoformat()}")
-    
-    async def check_active_swapanza(self):
-        """Check if there's an active Swapanza and send state to client"""
-        active_swapanza = await self.get_active_swapanza_session()
-        
-        if active_swapanza:
-            # Send current Swapanza state to the user
-            partner = await database_sync_to_async(lambda: active_swapanza.partner)()
-            
-            await self.send(text_data=json.dumps({
-                'type': 'swapanza.activate',
-                'started_at': active_swapanza.started_at.isoformat(),
-                'ends_at': active_swapanza.ends_at.isoformat(),
-                'partner_id': partner.id,
-                'partner_username': partner.username
-            }))
-            
-            print(f"Sent active Swapanza state to user {self.user.id} in chat {self.chat_id}")
-
     async def swapanza_activate(self, event):
-        """Send Swapanza activation notification to WebSocket"""
+        """Send Swapanza activation to WebSocket"""
         await self.send(text_data=json.dumps({
             'type': 'swapanza.activate',
             'started_at': event['started_at'],
-            'ends_at': event['ends_at']
+            'ends_at': event['ends_at'],
+            'partner_id': event['partner_id'],
+            'partner_username': event['partner_username'],
+            'partner_profile_image': event.get('partner_profile_image')
         }))
-
+    
     async def swapanza_expire(self, event):
-        """Send Swapanza expiration notification to WebSocket"""
-        print(f"Sending Swapanza expiration notification to user {self.user.id} in chat {self.chat_id}")
+        """Notify WebSocket that Swapanza has expired"""
         await self.send(text_data=json.dumps({
             'type': 'swapanza.expire'
         }))
@@ -406,15 +624,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Mark all messages in the chat as seen by the current user"""
         try:
             chat = Chat.objects.get(id=self.chat_id)
-            updated = Message.objects.filter(
-                chat=chat, 
-                seen=False
-            ).exclude(sender=self.user).update(seen=True)
-            
-            print(f"Marked {updated} messages as seen in chat {self.chat_id}")
-            return updated
+        
+            # Get all messages that are not yet read by this user
+            unread_messages = Message.objects.filter(
+                chat=chat
+            ).exclude(
+                read_by=self.user
+            ).exclude(
+                sender=self.user
+            )
+        
+            # Add user to read_by for each message
+            updated_count = 0
+            for message in unread_messages:
+                message.read_by.add(self.user)
+                updated_count += 1
+        
+            print(f"Marked {updated_count} messages as read in chat {self.chat_id}")
+            return updated_count
         except Exception as e:
-            print(f"Error marking messages as seen: {str(e)}")
+            print(f"Error marking messages as read: {str(e)}")
             return 0
     
     @database_sync_to_async
@@ -431,59 +660,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             print(f"Error getting active Swapanza session: {str(e)}")
             return None
 
-    @database_sync_to_async
-    def save_chat_message(self, content):
-        """Save a chat message to the database"""
-        chat = Chat.objects.get(id=self.chat_id)
-        
-        # Check if user is in a Swapanza session
-        active_swapanza = SwapanzaSession.objects.filter(
-            user=self.user,
-            chat=chat,
-            active=True,
-            ends_at__gt=timezone.now()
-        ).first()
-        
-        during_swapanza = active_swapanza is not None
-        
-        # Create the message
-        message = Message.objects.create(
-            chat=chat,
-            sender=self.user,
-            content=content,
-            during_swapanza=during_swapanza
-        )
-        
-        # If during Swapanza, set apparent sender
-        if during_swapanza and active_swapanza:
-            message.apparent_sender = active_swapanza.partner.id
-            message.save(update_fields=['apparent_sender'])
-            
-        return message
+    
 
-    @database_sync_to_async
-    def increment_swapanza_message_count(self):
-        """Increment the user's Swapanza message count"""
-        chat = Chat.objects.get(id=self.chat_id)
-        message_counts = chat.swapanza_message_count or {}
-        user_id_str = str(self.user.id)
-        
-        # Increment the count
-        count = message_counts.get(user_id_str, 0) + 1
-        message_counts[user_id_str] = count
-        
-        # Update the chat
-        chat.swapanza_message_count = message_counts
-        chat.save(update_fields=['swapanza_message_count'])
-        
-        # Also update the SwapanzaSession
-        SwapanzaSession.objects.filter(
-            user=self.user,
-            chat=chat,
-            active=True
-        ).update(message_count=count)
-        
-        return count
+    
 
     @database_sync_to_async
     def update_chat_with_swapanza_request(self, duration):
@@ -614,33 +793,4 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         return all_confirmed, confirmed_users, len(participants)
 
-    @database_sync_to_async
-    def validate_swapanza_message(self, content):
-        """Validate a message against Swapanza rules"""
-        # Check if user is in a Swapanza session
-        active_swapanza = SwapanzaSession.objects.filter(
-            user=self.user,
-            chat_id=self.chat_id,
-            active=True,
-            ends_at__gt=timezone.now()
-        ).first()
-        
-        if not active_swapanza:
-            return True, None  # Not in Swapanza, message is valid
-            
-        # Apply Swapanza rules
-        if len(content) > 7:
-            return False, "During Swapanza, messages are limited to 7 characters"
-            
-        if ' ' in content:
-            return False, "During Swapanza, spaces are not allowed in messages"
-            
-        # Check message count
-        chat = Chat.objects.get(id=self.chat_id)
-        message_counts = chat.swapanza_message_count or {}
-        user_count = message_counts.get(str(self.user.id), 0)
-        
-        if user_count >= 2:
-            return False, "You have reached your message limit (2) during this Swapanza"
-            
-        return True, None
+    

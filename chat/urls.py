@@ -18,7 +18,10 @@ urlpatterns = [
     path('reset-notifications/', views.reset_notifications, name='reset-notifications'),
     path('chats/find-by-user/<int:user_id>/', views.find_chat_by_user, name='find-chat-by-user'),
 
+    path('active-swapanza/', views.get_active_swapanza, name='active-swapanza'),
     path('can-start-swapanza/', views.can_start_swapanza, name='can-start-swapanza'),
+
+    
 
     path('', views.index, name='index'),
 ]

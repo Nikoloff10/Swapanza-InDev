@@ -325,6 +325,9 @@ def get_active_swapanza(request):
     user = request.user
     now = timezone.now()
     
+    # Get chat_id if provided in the request
+    chat_id = request.query_params.get('chat_id')
+    
     # Check for active session
     active_session = SwapanzaSession.objects.filter(
         user=user,
@@ -339,26 +342,38 @@ def get_active_swapanza(request):
     
     # Get partner information
     partner = active_session.partner
-    chat = active_session.chat
+    session_chat = active_session.chat
     
-    # Count messages sent during this Swapanza IN THE CURRENT CHAT
-    if chat:
-        # Use the chat's message count for this user
-        chat_message_counts = chat.swapanza_message_count or {}
-        message_count = chat_message_counts.get(str(user.id), 0)
+    # If chat_id is provided, use that chat for message counting
+    if chat_id:
+        try:
+            current_chat = Chat.objects.get(id=chat_id)
+            chat_message_counts = current_chat.swapanza_message_count or {}
+            message_count = chat_message_counts.get(str(user.id), 0)
+        except Chat.DoesNotExist:
+            # Fall back to session chat if the requested chat doesn't exist
+            if session_chat:
+                chat_message_counts = session_chat.swapanza_message_count or {}
+                message_count = chat_message_counts.get(str(user.id), 0)
+            else:
+                # Count all messages if no chat is associated
+                message_count = Message.objects.filter(
+                    sender=user,
+                    during_swapanza=True,
+                    created_at__gte=active_session.started_at
+                ).count()
     else:
-        # Fall back to counting all messages
-        message_count = Message.objects.filter(
-            sender=user,
-            during_swapanza=True,
-            created_at__gte=active_session.started_at,
-            created_at__lte=active_session.ends_at
-        ).count()
-    
-    # Update session message count for consistency
-    if message_count != active_session.message_count:
-        active_session.message_count = message_count
-        active_session.save(update_fields=['message_count'])
+        # Use the session's chat for counting if no chat_id provided
+        if session_chat:
+            chat_message_counts = session_chat.swapanza_message_count or {}
+            message_count = chat_message_counts.get(str(user.id), 0)
+        else:
+            # Count all messages if no chat is associated
+            message_count = Message.objects.filter(
+                sender=user,
+                during_swapanza=True,
+                created_at__gte=active_session.started_at
+            ).count()
     
     return Response({
         'active': True,
@@ -369,7 +384,7 @@ def get_active_swapanza(request):
         'started_at': active_session.started_at,
         'message_count': message_count,
         'remaining_messages': max(0, 2 - message_count),
-        'chat_id': chat.id if chat else None
+        'chat_id': session_chat.id if session_chat else None
     })
 
 @api_view(['GET'])

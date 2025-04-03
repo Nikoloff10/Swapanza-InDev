@@ -81,25 +81,28 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
   const fetchGlobalSwapanzaState = useCallback(async () => {
     if (!token) return;
-
+  
     try {
       const response = await axios.get("/api/active-swapanza/", {
         headers: { Authorization: `Bearer ${token}` },
+        params: { chat_id: chatId } // Add this parameter to specify current chat
       });
-
+  
       if (response.data.active) {
         // Apply Swapanza state regardless of current chat
         setIsSwapanzaActive(true);
         setSwapanzaEndTime(new Date(response.data.ends_at));
-        setRemainingMessages(response.data.remaining_messages);
         setSwapanzaStartTime(new Date(response.data.started_at));
-
+        
+        // Use chat-specific remaining messages count from the API
+        setRemainingMessages(response.data.remaining_messages);
+  
         setSwapanzaPartner({
           id: response.data.partner_id,
           username: response.data.partner_username,
           profile_image: response.data.partner_profile_image,
         });
-
+  
         // Update the time left
         const now = new Date();
         const endsAt = new Date(response.data.ends_at);
@@ -136,7 +139,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     } catch (error) {
       console.error("Error checking global Swapanza state:", error);
     }
-  }, [token, chat, resetSwapanza]);
+  }, [token, chatId, chat, resetSwapanza]);
 
   // Add effect for periodic checking
   useEffect(() => {

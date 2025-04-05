@@ -59,6 +59,31 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     onNewMessageRef.current = onNewMessage;
   }, [onNewMessage]);
 
+  const setupSwapanzaTimer = useCallback((endsAt) => {
+    if (swapanzaTimeLeftRef.current) {
+      clearInterval(swapanzaTimeLeftRef.current);
+    }
+
+    const updateTimeLeft = () => {
+      const now = new Date();
+      const diff = Math.max(0, Math.floor((endsAt - now) / 1000));
+      setTimeLeft(diff);
+
+      if (diff <= 0) {
+        clearInterval(swapanzaTimeLeftRef.current);
+        swapanzaTimeLeftRef.current = null;
+
+        // Reset Swapanza state when timer expires
+        if (resetSwapanzaRef.current) {
+          resetSwapanzaRef.current();
+        }
+      }
+    };
+
+    updateTimeLeft(); // Update immediately
+    swapanzaTimeLeftRef.current = setInterval(updateTimeLeft, 1000);
+  }, []);
+
   // Function to reset Swapanza state
   const resetSwapanza = useCallback(() => {
     setIsSwapanzaActive(false);
@@ -81,57 +106,44 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
   const fetchGlobalSwapanzaState = useCallback(async () => {
     if (!token) return;
-  
+
     try {
       const response = await axios.get("/api/active-swapanza/", {
         headers: { Authorization: `Bearer ${token}` },
-        params: { chat_id: chatId } // Add this parameter to specify current chat
+        params: { chat_id: chatId }, // Add chat_id to get chat-specific info
       });
-  
+
       if (response.data.active) {
         // Apply Swapanza state regardless of current chat
         setIsSwapanzaActive(true);
         setSwapanzaEndTime(new Date(response.data.ends_at));
         setSwapanzaStartTime(new Date(response.data.started_at));
-        
-        // Use chat-specific remaining messages count from the API
-        setRemainingMessages(response.data.remaining_messages);
-  
+
+        // Use the remaining_messages directly from the API
+        if (response.data.remaining_messages !== undefined) {
+          setRemainingMessages(response.data.remaining_messages);
+          console.log(
+            "Setting remaining messages from global state to:",
+            response.data.remaining_messages
+          );
+        }
+
         setSwapanzaPartner({
           id: response.data.partner_id,
           username: response.data.partner_username,
           profile_image: response.data.partner_profile_image,
         });
-  
+
         // Update the time left
         const now = new Date();
         const endsAt = new Date(response.data.ends_at);
         const diff = Math.max(0, Math.floor((endsAt - now) / 1000));
         setTimeLeft(diff);
 
-        // Start the countdown timer
-        if (swapanzaTimeLeftRef.current) {
-          clearInterval(swapanzaTimeLeftRef.current);
+        // Start the countdown timer if needed
+        if (!swapanzaTimeLeftRef.current) {
+          setupSwapanzaTimer(endsAt);
         }
-
-        const updateTimeLeft = () => {
-          const now = new Date();
-          const diff = Math.max(0, Math.floor((endsAt - now) / 1000));
-          setTimeLeft(diff);
-
-          if (diff <= 0) {
-            clearInterval(swapanzaTimeLeftRef.current);
-            swapanzaTimeLeftRef.current = null;
-
-            // Reset Swapanza state when timer expires
-            if (resetSwapanzaRef.current) {
-              resetSwapanzaRef.current();
-            }
-          }
-        };
-
-        updateTimeLeft();
-        swapanzaTimeLeftRef.current = setInterval(updateTimeLeft, 1000);
       } else if (!chat?.swapanza_active) {
         // Only reset if we're not in a chat-specific Swapanza
         resetSwapanza();
@@ -139,7 +151,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     } catch (error) {
       console.error("Error checking global Swapanza state:", error);
     }
-  }, [token, chatId, chat, resetSwapanza]);
+  }, [token, chatId, chat, resetSwapanza, setupSwapanzaTimer]);
 
   // Add effect for periodic checking
   useEffect(() => {
@@ -279,10 +291,9 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   // Store in ref
   startSwapanzaCountdownRef.current = startSwapanzaCountdown;
 
-  // Function to handle chat messages
   const handleChatMessage = useCallback(
     (message) => {
-      if (message && message.id && message.content) {
+      if (message && (message.id || message.content)) {
         console.log("Processing received message:", message);
 
         setMessages((prevMessages) => {
@@ -300,17 +311,9 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
           }
 
           // Check if this is a confirmation of a pending message
-          // Look for a pending message with matching content
-          console.log(
-            "Looking for pending message with content:",
-            message.content
-          );
-
           const pendingIndex = updatedMessages.findIndex(
             (m) => m.pending === true && m.content === message.content
           );
-
-          console.log("Pending message index:", pendingIndex);
 
           if (pendingIndex !== -1) {
             // Replace the pending message with the confirmed one
@@ -336,18 +339,8 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
           return [...updatedMessages, message];
         });
 
-        // Update remaining messages count if provided by server
-        if (
-          message.remaining_messages !== undefined &&
-          Number(message.sender) === Number(currentUserId)
-        ) {
-          // Always use the server-provided remaining count
-          setRemainingMessages(message.remaining_messages);
-          console.log(
-            "Updated remaining messages to:",
-            message.remaining_messages
-          );
-        }
+        // Note: We handle the remaining_messages update at the WebSocket level now
+        // to ensure it's always processed regardless of message format
 
         if (Number(message.sender) !== Number(currentUserId)) {
           console.log("Calling onNewMessage callback");
@@ -513,7 +506,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     [currentUserId]
   );
 
-  // Update the activate_swapanza handler to handle partner info
+  // Complete handleSwapanzaActivate function
   const handleSwapanzaActivate = useCallback(
     (data) => {
       console.log("Swapanza activated:", data);
@@ -527,7 +520,21 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       setSwapanzaStartTime(startedAt);
       setSwapanzaEndTime(endsAt);
       setIsSwapanzaActive(true);
-      setRemainingMessages(2);
+
+      // Set remaining messages if provided by server, otherwise use default value
+      if (
+        data.remaining_messages !== undefined &&
+        data.remaining_messages !== null
+      ) {
+        setRemainingMessages(Math.max(data.remaining_messages, 0));
+        console.log(
+          "Setting remaining messages from activation to:",
+          data.remaining_messages
+        );
+      } else {
+        // Default to 2 messages if not specified by server
+        setRemainingMessages(2);
+      }
 
       // Clear confirmation state
       setUserConfirmedSwapanza(false);
@@ -538,12 +545,19 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         setSwapanzaPartner({
           id: data.partner_id,
           username: data.partner_username,
+          profile_image: data.partner_profile_image || null,
         });
       } else {
         // Find partner from chat participants
-        const partner = chat?.participants?.find((p) => p.id !== currentUserId);
+        const partner = chat?.participants?.find(
+          (p) => Number(p.id) !== Number(currentUserId)
+        );
         if (partner) {
-          setSwapanzaPartner(partner);
+          setSwapanzaPartner({
+            id: partner.id,
+            username: partner.username,
+            profile_image: partner.profile_image_url || null,
+          });
         }
       }
 
@@ -560,6 +574,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         if (diff <= 0) {
           clearInterval(swapanzaTimeLeftRef.current);
           swapanzaTimeLeftRef.current = null;
+
+          // Reset Swapanza when timer expires
+          if (resetSwapanzaRef.current) {
+            resetSwapanzaRef.current();
+          }
         }
       };
 
@@ -572,10 +591,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         JSON.stringify({
           active: true,
           endsAt: endsAt.toISOString(),
+          remainingMessages: data.remaining_messages || 2,
         })
       );
     },
-    [chat, chatId, currentUserId]
+    [chat, chatId, currentUserId, resetSwapanzaRef]
   );
 
   // Function to handle Swapanza expiration
@@ -634,12 +654,29 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
             switch (data.type) {
               case "chat.message":
-                handleChatMessage(data.message || data);
+                // Extract message data - either from data.message object or from data itself
+                const messageData = data.message || data;
+
+                // Always update remaining messages if this is during Swapanza
+                if (
+                  isSwapanzaActive &&
+                  messageData.remaining_messages !== undefined &&
+                  Number(messageData.sender) === Number(currentUserId)
+                ) {
+                  const remainingMsgs = parseInt(
+                    messageData.remaining_messages
+                  );
+                  setRemainingMessages(
+                    isNaN(remainingMsgs) ? 0 : Math.max(0, remainingMsgs)
+                  );
+                  console.log("Updated remaining messages to:", remainingMsgs);
+                }
+
+                handleChatMessage(messageData);
                 break;
               case "chat.messages_read":
                 handleMessagesRead(data);
                 break;
-
               case "chat.message.error":
                 // Handle message validation error
                 alert(data.message || "Failed to send message");
@@ -761,6 +798,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     handleSwapanzaExpire,
     handleSwapanzaLogout,
     handleServerError,
+    isSwapanzaActive,
   ]);
 
   // Fetch chat details
@@ -1191,6 +1229,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     );
   });
   // Render Swapanza section based on state
+  // Complete renderSwapanzaSection function
   const renderSwapanzaSection = () => {
     if (isSwapanzaActive && swapanzaEndTime) {
       return (
@@ -1213,7 +1252,23 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
             <div className="text-xs mt-1">
               You appear as: {swapanzaPartner?.username}
               <span className="mx-2">•</span>
-              Messages left: {remainingMessages}
+              {/* Always ensure remainingMessages is displayed as a numeric value */}
+              <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded">
+                Messages left:{" "}
+                {isSwapanzaActive &&
+                remainingMessages === 0 &&
+                messages.filter(
+                  (m) =>
+                    m.sender === currentUserId &&
+                    m.during_swapanza &&
+                    !m.pending
+                ).length === 0
+                  ? 2 // Show 2 when no messages have been sent yet during Swapanza
+                  : remainingMessages !== null &&
+                    remainingMessages !== undefined
+                  ? Math.max(remainingMessages, 0)
+                  : 2}
+              </span>
             </div>
           </div>
         </div>

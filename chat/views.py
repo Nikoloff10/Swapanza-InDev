@@ -305,11 +305,17 @@ def reset_notifications(request):
     # For each chat, mark messages as read
     total_updated = 0
     for chat in chats:
-        updated = Message.objects.filter(
-            chat=chat,
-            seen=False
-        ).exclude(sender=user).update(seen=True)
-        total_updated += updated
+        unread_messages = Message.objects.filter(
+            chat=chat
+        ).exclude(
+            read_by=user  # Use read_by instead of seen
+        ).exclude(
+            sender=user
+        )
+        
+        for message in unread_messages:
+            message.read_by.add(user)
+            total_updated += 1
     
     return Response({"message": f"Reset {total_updated} notifications"}, status=status.HTTP_200_OK)
 
@@ -344,36 +350,25 @@ def get_active_swapanza(request):
     partner = active_session.partner
     session_chat = active_session.chat
     
-    # If chat_id is provided, use that chat for message counting
+    # Calculate chat-specific message count for UI feedback
+    chat_specific_count = 0
     if chat_id:
         try:
             current_chat = Chat.objects.get(id=chat_id)
             chat_message_counts = current_chat.swapanza_message_count or {}
-            message_count = chat_message_counts.get(str(user.id), 0)
+            chat_specific_count = chat_message_counts.get(str(user.id), 0)
         except Chat.DoesNotExist:
-            # Fall back to session chat if the requested chat doesn't exist
-            if session_chat:
-                chat_message_counts = session_chat.swapanza_message_count or {}
-                message_count = chat_message_counts.get(str(user.id), 0)
-            else:
-                # Count all messages if no chat is associated
-                message_count = Message.objects.filter(
-                    sender=user,
-                    during_swapanza=True,
-                    created_at__gte=active_session.started_at
-                ).count()
-    else:
-        # Use the session's chat for counting if no chat_id provided
-        if session_chat:
-            chat_message_counts = session_chat.swapanza_message_count or {}
-            message_count = chat_message_counts.get(str(user.id), 0)
-        else:
-            # Count all messages if no chat is associated
-            message_count = Message.objects.filter(
-                sender=user,
-                during_swapanza=True,
-                created_at__gte=active_session.started_at
-            ).count()
+            pass
+    
+    # Calculate TOTAL messages across ALL chats for this Swapanza session
+    total_message_count = Message.objects.filter(
+        sender=user,
+        during_swapanza=True,
+        created_at__gte=active_session.started_at
+    ).count()
+    
+    # Use total count for remaining message calculation
+    remaining_messages = max(0, 2 - total_message_count)
     
     return Response({
         'active': True,
@@ -382,8 +377,9 @@ def get_active_swapanza(request):
         'partner_profile_image': partner.profile_image_url if hasattr(partner, 'profile_image_url') else None,
         'ends_at': active_session.ends_at,
         'started_at': active_session.started_at,
-        'message_count': message_count,
-        'remaining_messages': max(0, 2 - message_count),
+        'message_count': total_message_count,
+        'chat_specific_count': chat_specific_count,
+        'remaining_messages': remaining_messages,
         'chat_id': session_chat.id if session_chat else None
     })
 

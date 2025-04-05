@@ -206,8 +206,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # If session is tied to a chat, use that chat's message count
         if active_session.chat:
             chat = active_session.chat
-            chat_message_counts = chat.swapanza_message_count or {}
-            message_count = chat_message_counts.get(str(user.id), 0)
+            # Check if this is a different chat than the primary Swapanza chat
+            if int(self.chat_id) != chat.id:
+                # For other chats, check if there's any message count data
+                current_chat = Chat.objects.get(id=self.chat_id)
+                chat_message_counts = current_chat.swapanza_message_count or {}
+                message_count = chat_message_counts.get(str(user.id), 0)
+            else:
+                # For the primary Swapanza chat, use its message count
+                chat_message_counts = chat.swapanza_message_count or {}
+                message_count = chat_message_counts.get(str(user.id), 0)
         else:
             # If no chat is associated, count messages in the current chat
             message_count = Message.objects.filter(
@@ -247,39 +255,42 @@ class ChatConsumer(AsyncWebsocketConsumer):
     
         # Perform Swapanza validations if needed
         if during_swapanza:
-            # Check message length
+            # Count messages sent in THIS SPECIFIC CHAT during the active Swapanza
+            chat_messages_sent = Message.objects.filter(
+                sender=user,
+                chat=chat,  # Filter by current chat
+                during_swapanza=True,
+                created_at__gte=active_session.started_at
+            ).count()
+            
+            # Check per-chat limit instead of global limit
+            if chat_messages_sent >= 2:
+                return {
+                    'error': True,
+                    'message': "You have reached your message limit for this chat during Swapanza",
+                    'content': content
+                }
+            
+            # Keep these other validations the same
             if len(content) > 7:
                 return {
                     'error': True,
                     'message': "During Swapanza, messages must be 7 characters or less",
                     'content': content
                 }
-        
-            # Check for spaces
+    
             if ' ' in content:
                 return {
                     'error': True,
                     'message': "During Swapanza, spaces are not allowed in messages",
                     'content': content
                 }
-        
-            # Check message count - ONLY COUNT MESSAGES IN THE CURRENT CHAT
-            message_count = Message.objects.filter(
-                sender=user,
-                chat=chat,  # Add this to filter by current chat
-                during_swapanza=True,
-                created_at__gte=active_session.started_at
-            ).count()
-        
-            if message_count >= 2:
-                return {
-                    'error': True,
-                    'message': "You have reached your message limit for this Swapanza chat",
-                    'content': content
-                }
-        
-            # Set the apparent_sender to the partner during Swapanza
-            apparent_sender = active_session.partner
+                
+            # Only set the apparent_sender in the original Swapanza chat
+            if active_session.chat_id == int(self.chat_id):
+                apparent_sender = active_session.partner
+            else:
+                apparent_sender = None
         else:
             apparent_sender = None
     
@@ -292,21 +303,29 @@ class ChatConsumer(AsyncWebsocketConsumer):
             apparent_sender=apparent_sender
         )
     
-        # Update message counts for Swapanza if needed
+        # Update message counts - now per-chat
         remaining_messages = None
         if during_swapanza:
-            # Update session message count
-            message_count += 1
-        
-            # Update the current chat's message count
+            # Calculate CHAT-SPECIFIC remaining messages after creating the new message
+            chat_messages_count = Message.objects.filter(
+                sender=user,
+                chat=chat,  # Specific to this chat
+                during_swapanza=True,
+                created_at__gte=active_session.started_at
+            ).count()
+            
+            # Calculate remaining messages for this chat
+            remaining_messages = max(0, 2 - chat_messages_count)
+            
+            # Update counter in the current chat
+            chat.refresh_from_db(fields=['swapanza_message_count'])
             chat_message_counts = chat.swapanza_message_count or {}
             user_id_str = str(user.id)
-            chat_message_counts[user_id_str] = chat_message_counts.get(user_id_str, 0) + 1
+            
+            # Update to match actual count for this chat
+            chat_message_counts[user_id_str] = chat_messages_count
             chat.swapanza_message_count = chat_message_counts
             chat.save(update_fields=['swapanza_message_count'])
-        
-            # Calculate remaining messages in THIS chat
-            remaining_messages = max(0, 2 - chat_message_counts.get(user_id_str, 0))
     
         return {
             'id': message.id,
@@ -324,22 +343,35 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Check if the current chat has an active Swapanza and notify client"""
         chat = Chat.objects.get(id=self.chat_id)
         now = timezone.now()
-        
+        user = self.user
+    
+        # First check if this specific chat has an active Swapanza
         if chat.swapanza_active and chat.swapanza_ends_at and chat.swapanza_ends_at > now:
             # Find the other participant
             participants = list(chat.participants.all())
             if len(participants) < 2:
                 return
-            
+    
             other_participant = None
             for p in participants:
                 if p.id != self.user.id:
                     other_participant = p
                     break
-            
+    
             if not other_participant:
                 return
-            
+    
+            # Get the current message count for this user
+            chat_message_counts = chat.swapanza_message_count or {}
+            user_id_str = str(self.user.id)
+            current_count = chat_message_counts.get(user_id_str, 0)
+    
+            # Calculate remaining messages
+            remaining_messages = max(0, 2 - current_count)
+        
+            # Log the values for debugging
+            print(f"Active Swapanza in chat {chat.id} - user {user_id_str} has {current_count} messages, {remaining_messages} remaining")
+    
             # Send current Swapanza state to the client
             return self.send(text_data=json.dumps({
                 'type': 'swapanza.activate',
@@ -347,9 +379,41 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'ends_at': chat.swapanza_ends_at.isoformat(),
                 'partner_id': other_participant.id,
                 'partner_username': other_participant.username,
-                'partner_profile_image': other_participant.profile_image_url if hasattr(other_participant, 'profile_image_url') else None
+                'partner_profile_image': other_participant.profile_image_url if hasattr(other_participant, 'profile_image_url') else None,
+                'remaining_messages': remaining_messages
             }))
-
+        else:
+            # Check if there's an active global Swapanza session instead
+            active_session = SwapanzaSession.objects.filter(
+                user=self.user,
+                active=True,
+                ends_at__gt=now
+            ).first()
+            
+            if active_session and active_session.chat_id != int(self.chat_id):
+                # For other chats during Swapanza, count messages in THIS chat, not original chat
+                current_count = Message.objects.filter(
+                    sender=user,
+                    chat_id=self.chat_id,  # Use current chat ID
+                    during_swapanza=True,
+                    created_at__gte=active_session.started_at
+                ).count()
+                
+                # Calculate remaining messages for THIS chat
+                remaining_messages = max(0, 2 - current_count)
+                
+                print(f"Global Swapanza active - user {user.id} has used {current_count} messages in chat {self.chat_id}, {remaining_messages} remaining")
+                
+                # Send Swapanza activation message with remaining count
+                return self.send(text_data=json.dumps({
+                    'type': 'swapanza.activate',
+                    'started_at': active_session.started_at.isoformat(),
+                    'ends_at': active_session.ends_at.isoformat(),
+                    'partner_id': active_session.partner.id,
+                    'partner_username': active_session.partner.username,
+                    'partner_profile_image': active_session.partner.profile_image_url if hasattr(active_session.partner, 'profile_image_url') else None,
+                    'remaining_messages': remaining_messages
+                }))
     # Create a Swapanza request
     @database_sync_to_async
     def create_swapanza_request(self, duration):

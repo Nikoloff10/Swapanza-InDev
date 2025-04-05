@@ -1228,56 +1228,56 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       </div>
     );
   });
-  // Render Swapanza section based on state
-  // Complete renderSwapanzaSection function
+
+
   const renderSwapanzaSection = () => {
-    if (isSwapanzaActive && swapanzaEndTime) {
-      return (
-        <div className="border-t p-2 bg-purple-100">
-          <div className="text-center text-sm font-semibold text-purple-800">
-            <div>
-              <span className="font-bold">Swapanza Active!</span>
-              {timeLeft !== null && (
-                <span className="ml-2">
-                  Time Left: {Math.floor(timeLeft / 60)}:
-                  {(timeLeft % 60).toString().padStart(2, "0")}
-                </span>
-              )}
-            </div>
-            {swapanzaStartTime && (
-              <div className="text-xs">
-                Started: {new Date(swapanzaStartTime).toLocaleTimeString()}
-              </div>
-            )}
-            <div className="text-xs mt-1">
-              You appear as: {swapanzaPartner?.username}
-              <span className="mx-2">•</span>
-              {/* Always ensure remainingMessages is displayed as a numeric value */}
-              <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded">
-                Messages left:{" "}
-                {isSwapanzaActive &&
-                remainingMessages === 0 &&
-                messages.filter(
-                  (m) =>
-                    m.sender === currentUserId &&
-                    m.during_swapanza &&
-                    !m.pending
-                ).length === 0
-                  ? 2 // Show 2 when no messages have been sent yet during Swapanza
-                  : remainingMessages !== null &&
-                    remainingMessages !== undefined
-                  ? Math.max(remainingMessages, 0)
-                  : 2}
+  if (isSwapanzaActive && swapanzaEndTime) {
+    // Count actual messages sent during Swapanza in the UI
+    const messagesInThisChat = messages.filter(
+      (m) => m.sender === currentUserId && m.during_swapanza && !m.pending
+    ).length;
+    
+    // Calculate display value from what we can see in the UI
+    const displayRemainingMessages = messagesInThisChat === 0 ? 2 : Math.max(0, 2 - messagesInThisChat);
+    
+    // Use the greater of our calculated value or the server-provided value
+    const finalRemainingMessages = Math.max(
+      displayRemainingMessages,
+      remainingMessages !== null && remainingMessages !== undefined ? remainingMessages : 0
+    );
+
+    return (
+      <div className="border-t p-2 bg-purple-100">
+        <div className="text-center text-sm font-semibold text-purple-800">
+          <div>
+            <span className="font-bold">Swapanza Active!</span>
+            {timeLeft !== null && (
+              <span className="ml-2">
+                Time Left: {Math.floor(timeLeft / 60)}:
+                {(timeLeft % 60).toString().padStart(2, "0")}
               </span>
+            )}
+          </div>
+          {swapanzaStartTime && (
+            <div className="text-xs">
+              Started: {new Date(swapanzaStartTime).toLocaleTimeString()}
             </div>
+          )}
+          <div className="text-xs mt-1">
+            You appear as: {swapanzaPartner?.username}
+            <span className="mx-2">•</span>
+            <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded">
+              Messages left: {finalRemainingMessages}
+            </span>
           </div>
         </div>
-      );
+      </div>
+    );
     } else if (swapanzaRequestedByUsername) {
       // Swapanza request pending
       const isCurrentUserRequester =
         Number(swapanzaRequestedBy) === Number(currentUserId);
-
+  
       return (
         <div className="border-t p-2 bg-yellow-100">
           <div className="text-center text-sm">
@@ -1288,7 +1288,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
                 <b>{swapanzaRequestedByUsername}</b> invited you to Swapanza
               </span>
             )}
-
+  
             {!userConfirmedSwapanza && (
               <button
                 onClick={confirmSwapanza}
@@ -1297,7 +1297,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
                 Confirm
               </button>
             )}
-
+  
             {userConfirmedSwapanza && partnerConfirmedSwapanza ? (
               <span className="block text-xs text-green-600">
                 Both confirmed! Starting Swapanza...
@@ -1311,7 +1311,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         </div>
       );
     }
-
+  
     return null;
   };
 

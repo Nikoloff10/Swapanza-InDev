@@ -250,7 +250,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         chat = Chat.objects.get(id=self.chat_id)
         now = timezone.now()
     
-        # Check for active Swapanza session
+        # Check for active Swapanza session - looking at ANY active session, not just in this chat
         active_session = SwapanzaSession.objects.filter(
             user=user,
             active=True,
@@ -259,6 +259,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
     
         # Set during_swapanza based on global session
         during_swapanza = active_session is not None
+        apparent_sender = None
+        apparent_sender_username = None
+        apparent_sender_profile_image = None
     
         # Perform Swapanza validations if needed
         if during_swapanza:
@@ -293,22 +296,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'message': "During Swapanza, spaces are not allowed in messages",
                     'content': content
                 }
-                
-            # Only set the apparent_sender in the original Swapanza chat
-            if active_session.chat_id == int(self.chat_id):
-                apparent_sender = active_session.partner
+                    
+            # IMPORTANT CHANGE: Always set apparent_sender during Swapanza, regardless of which chat
+            apparent_sender = active_session.partner
+            
+            # CRITICAL ADDITION: Store the username and profile image directly 
+            # so they're available when loading from database later
+            apparent_sender_username = apparent_sender.username
+            
+            # Get profile image if available
+            if hasattr(apparent_sender, 'profile_image_url') and apparent_sender.profile_image_url:
+                apparent_sender_profile_image = apparent_sender.profile_image_url
+            elif hasattr(apparent_sender, 'profile') and hasattr(apparent_sender.profile, 'profile_image_url') and apparent_sender.profile.profile_image_url:
+                apparent_sender_profile_image = apparent_sender.profile.profile_image_url
             else:
-                apparent_sender = None
-        else:
-            apparent_sender = None
+                apparent_sender_profile_image = ""  # Empty string instead of null
     
-        # Create and save the message
+        # Create and save the message with the apparent sender info
         message = Message.objects.create(
             sender=user,
             chat=chat,
             content=content,
             during_swapanza=during_swapanza,
-            apparent_sender=apparent_sender
+            apparent_sender=apparent_sender,
+            apparent_sender_username=apparent_sender_username,
+            apparent_sender_profile_image=apparent_sender_profile_image
         )
     
         # Update message counts - now per-chat
@@ -335,15 +347,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             chat.swapanza_message_count = chat_message_counts
             chat.save(update_fields=['swapanza_message_count'])
     
-        return {
+        # Return message with additional info
+        result = {
             'id': message.id,
             'sender': user.id,
             'content': content,
             'created_at': message.created_at.isoformat(),
             'during_swapanza': during_swapanza,
             'apparent_sender': apparent_sender.id if apparent_sender else None,
-            'remaining_messages': remaining_messages
+            'remaining_messages': remaining_messages,
+            'apparent_sender_username': apparent_sender_username,
+            'apparent_sender_profile_image': apparent_sender_profile_image
         }
+        
+        return result
+        
 
     # Check if chat has active Swapanza
     @database_sync_to_async
@@ -636,10 +654,37 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Send chat message to WebSocket"""
         message = event['message']
         
-        await self.send(text_data=json.dumps({
+        # Make sure the apparent_sender information is included for Swapanza messages
+        data_to_send = {
             'type': 'chat.message',
-            **message
-        }))
+        }
+        
+        # Make sure we include all fields from the message
+        for key, value in message.items():
+            data_to_send[key] = value
+                
+        # Explicitly ensure these fields are included for Swapanza messages
+        if message.get('during_swapanza') and message.get('apparent_sender'):
+            # Always fetch from the database for reliability
+            try:
+                from django.contrib.auth.models import User
+                apparent_sender_id = message.get('apparent_sender')
+                
+                # Fetch the apparent_sender information
+                apparent_sender = User.objects.get(id=apparent_sender_id)
+                data_to_send['apparent_sender_username'] = apparent_sender.username
+                
+                # Get profile image if available
+                if hasattr(apparent_sender, 'profile_image_url') and apparent_sender.profile_image_url:
+                    data_to_send['apparent_sender_profile_image'] = apparent_sender.profile_image_url
+                elif hasattr(apparent_sender, 'profile') and hasattr(apparent_sender.profile, 'profile_image_url') and apparent_sender.profile.profile_image_url:
+                    data_to_send['apparent_sender_profile_image'] = apparent_sender.profile.profile_image_url
+                else:
+                    data_to_send['apparent_sender_profile_image'] = ""  # Empty string instead of null
+            except Exception as e:
+                print(f"Error getting apparent sender info: {str(e)}")
+        
+        await self.send(text_data=json.dumps(data_to_send))
     
     async def messages_read(self, event):
         """Notify WebSocket that messages have been read"""

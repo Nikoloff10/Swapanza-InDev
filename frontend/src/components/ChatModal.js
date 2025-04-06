@@ -607,30 +607,31 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
   const handleSwapanzaLogout = useCallback(() => {
     console.log("Received Swapanza logout notification - forcing logout");
-    
+
     // Clear all storage
     localStorage.removeItem("token");
     localStorage.removeItem("userId");
-    localStorage.removeItem("username"); 
+    localStorage.removeItem("username");
     localStorage.removeItem("activeSwapanza");
-    
+
     // Clear any chat-specific Swapanza data
     const keys = Object.keys(localStorage);
-    keys.forEach(key => {
+    keys.forEach((key) => {
       if (key.startsWith("swapanza_active_")) {
         localStorage.removeItem(key);
       }
     });
-    
+
     // Show a message (optional)
-    alert("Your Swapanza session has expired. You will be redirected to login.");
-    
+    alert(
+      "Your Swapanza session has expired. You will be redirected to login."
+    );
+
     // Force a hard redirect to login page (no client-side routing)
     window.location.href = "/login";
   }, []);
-  
+
   // In the websocket message handler:
-  
 
   // Function to handle server errors
   const handleServerError = useCallback((data) => {
@@ -1165,49 +1166,56 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   // Render a message component with memoization
   // Update the MemoizedMessage component to use swapanzaPartner
   const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
-    // Always use the message's during_swapanza property directly
-    const isDuringSwapanza = msg.during_swapanza;
+    // Debug output can stay
+    console.log("Message data:", {
+      content: msg.content,
+      isDuringSwapanza: msg.during_swapanza, 
+      hasApparentSender: Boolean(msg.apparent_sender),
+      apparentSenderId: msg.apparent_sender,
+      apparentSenderUsername: msg.apparent_sender_username,
+      msgKeys: Object.keys(msg)
+    });
+  
+    const isDuringSwapanza = msg.during_swapanza === true;
     const isPending = msg.pending === true;
-
+  
+    // Message style unchanged
     let messageStyle = isCurrentUser
-      ? `${
-          isDuringSwapanza ? "bg-purple-500" : "bg-blue-500"
-        } text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words`
-      : `${
-          isDuringSwapanza ? "bg-purple-200" : "bg-gray-200"
-        } text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words`;
-
+      ? `${isDuringSwapanza ? "bg-purple-500" : "bg-blue-500"} text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words`
+      : `${isDuringSwapanza ? "bg-purple-200" : "bg-gray-200"} text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words`;
+  
     if (isPending) {
       messageStyle += " opacity-70";
     }
-
-    // Determine which user to show based on message attributes
+  
+    // Determine which username to display
     let displayUsername, profileImage;
-
+  
+    // SIMPLIFIED LOGIC FOR SWAPANZA MESSAGES
     if (isDuringSwapanza) {
-      if (msg.apparent_sender) {
-        // Use the apparent_sender from the message itself
-        const apparentSender = chat.participants.find(
-          (p) => Number(p.id) === Number(msg.apparent_sender)
-        );
-        displayUsername = apparentSender?.username || "Unknown";
-        profileImage = apparentSender?.profile_image_url || null;
-      } else {
-        // Fall back to swapanzaPartner for backwards compatibility
-        displayUsername = isCurrentUser
-          ? swapanzaPartner?.username
-          : otherParticipant?.username;
-        profileImage = isCurrentUser ? null : swapanzaPartner?.profile_image;
+      if (isCurrentUser && swapanzaPartner) {
+        // Current user's messages - show as partner
+        displayUsername = swapanzaPartner.username;
+        profileImage = swapanzaPartner.profile_image || null;
+      } 
+      else if (msg.apparent_sender_username) {
+        // FIXED: Always use apparent_sender_username if available
+        displayUsername = msg.apparent_sender_username;
+        profileImage = msg.apparent_sender_profile_image || null;
+      }
+      else {
+        // Fallback to normal sender
+        const sender = chat.participants.find(p => Number(p.id) === Number(msg.sender));
+        displayUsername = sender?.username || "Unknown";
+        profileImage = sender?.profile_image_url || null;
       }
     } else {
-      // For normal messages, show the actual sender
-      const sender = chat.participants.find(
-        (p) => Number(p.id) === Number(msg.sender)
-      );
+      // Non-Swapanza messages - use normal sender
+      const sender = chat.participants.find(p => Number(p.id) === Number(msg.sender));
       displayUsername = sender?.username || "Unknown";
       profileImage = sender?.profile_image_url || null;
     }
-
+  
     return (
       <div className="flex items-end">
         {!isCurrentUser && (
@@ -1221,13 +1229,13 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
             ) : (
               <div className="h-full w-full flex items-center justify-center">
                 <span className="text-xs">
-                  {displayUsername[0]?.toUpperCase()}
+                  {displayUsername?.[0]?.toUpperCase() || '?'}
                 </span>
               </div>
             )}
           </div>
         )}
-
+  
         <div className={messageStyle}>
           <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
           <div className="text-xs mt-1 opacity-75 flex justify-between">
@@ -1246,55 +1254,57 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     );
   });
 
-
   const renderSwapanzaSection = () => {
-  if (isSwapanzaActive && swapanzaEndTime) {
-    // Count actual messages sent during Swapanza in the UI
-    const messagesInThisChat = messages.filter(
-      (m) => m.sender === currentUserId && m.during_swapanza && !m.pending
-    ).length;
-    
-    // Calculate display value from what we can see in the UI
-    const displayRemainingMessages = messagesInThisChat === 0 ? 2 : Math.max(0, 2 - messagesInThisChat);
-    
-    // Use the greater of our calculated value or the server-provided value
-    const finalRemainingMessages = Math.max(
-      displayRemainingMessages,
-      remainingMessages !== null && remainingMessages !== undefined ? remainingMessages : 0
-    );
+    if (isSwapanzaActive && swapanzaEndTime) {
+      // Count actual messages sent during Swapanza in the UI
+      const messagesInThisChat = messages.filter(
+        (m) => m.sender === currentUserId && m.during_swapanza && !m.pending
+      ).length;
 
-    return (
-      <div className="border-t p-2 bg-purple-100">
-        <div className="text-center text-sm font-semibold text-purple-800">
-          <div>
-            <span className="font-bold">Swapanza Active!</span>
-            {timeLeft !== null && (
-              <span className="ml-2">
-                Time Left: {Math.floor(timeLeft / 60)}:
-                {(timeLeft % 60).toString().padStart(2, "0")}
-              </span>
-            )}
-          </div>
-          {swapanzaStartTime && (
-            <div className="text-xs">
-              Started: {new Date(swapanzaStartTime).toLocaleTimeString()}
+      // Calculate display value from what we can see in the UI
+      const displayRemainingMessages =
+        messagesInThisChat === 0 ? 2 : Math.max(0, 2 - messagesInThisChat);
+
+      // Use the greater of our calculated value or the server-provided value
+      const finalRemainingMessages = Math.max(
+        displayRemainingMessages,
+        remainingMessages !== null && remainingMessages !== undefined
+          ? remainingMessages
+          : 0
+      );
+
+      return (
+        <div className="border-t p-2 bg-purple-100">
+          <div className="text-center text-sm font-semibold text-purple-800">
+            <div>
+              <span className="font-bold">Swapanza Active!</span>
+              {timeLeft !== null && (
+                <span className="ml-2">
+                  Time Left: {Math.floor(timeLeft / 60)}:
+                  {(timeLeft % 60).toString().padStart(2, "0")}
+                </span>
+              )}
             </div>
-          )}
-          <div className="text-xs mt-1">
-            You appear as: {swapanzaPartner?.username}
-            <span className="mx-2">•</span>
-            <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded">
-              Messages left: {finalRemainingMessages}
-            </span>
+            {swapanzaStartTime && (
+              <div className="text-xs">
+                Started: {new Date(swapanzaStartTime).toLocaleTimeString()}
+              </div>
+            )}
+            <div className="text-xs mt-1">
+              You appear as: {swapanzaPartner?.username}
+              <span className="mx-2">•</span>
+              <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded">
+                Messages left: {finalRemainingMessages}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
     } else if (swapanzaRequestedByUsername) {
       // Swapanza request pending
       const isCurrentUserRequester =
         Number(swapanzaRequestedBy) === Number(currentUserId);
-  
+
       return (
         <div className="border-t p-2 bg-yellow-100">
           <div className="text-center text-sm">
@@ -1305,7 +1315,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
                 <b>{swapanzaRequestedByUsername}</b> invited you to Swapanza
               </span>
             )}
-  
+
             {!userConfirmedSwapanza && (
               <button
                 onClick={confirmSwapanza}
@@ -1314,7 +1324,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
                 Confirm
               </button>
             )}
-  
+
             {userConfirmedSwapanza && partnerConfirmedSwapanza ? (
               <span className="block text-xs text-green-600">
                 Both confirmed! Starting Swapanza...
@@ -1328,7 +1338,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         </div>
       );
     }
-  
+
     return null;
   };
 
@@ -1379,9 +1389,13 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
             )}
             <div className="flex flex-col">
               <h2 className="text-xl font-semibold">
-                {isSwapanzaActive && swapanzaPartner
-                  ? swapanzaPartner.username
-                  : otherParticipant
+                {isSwapanzaActive && chat?.participants
+                  ? // During Swapanza, find the other participant and use their display name directly
+                    chat.participants.find(
+                      (p) => Number(p.id) !== Number(currentUserId)
+                    )?.username || "Chat"
+                  : // Normal display
+                  otherParticipant
                   ? otherParticipant.username
                   : "Chat"}
               </h2>

@@ -48,7 +48,10 @@ class Message(models.Model):
     read_by = models.ManyToManyField(User, related_name='read_messages', blank=True)
     during_swapanza = models.BooleanField(default=False)
     apparent_sender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='apparent_messages')
-    
+    apparent_sender_username = models.CharField(max_length=150, blank=True, null=True)
+    apparent_sender_profile_image = models.CharField(max_length=500, blank=True, null=True)
+
+
     class Meta:
         ordering = ['created_at']
         indexes = [

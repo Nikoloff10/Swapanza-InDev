@@ -21,7 +21,8 @@ class UserSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'content', 'created_at', 'during_swapanza', 'apparent_sender']
+        fields = ['id', 'sender', 'content', 'created_at', 'during_swapanza', 'apparent_sender', 
+                  'apparent_sender_username', 'apparent_sender_profile_image']
         read_only_fields = ['id', 'sender']
 
     def create(self, validated_data):

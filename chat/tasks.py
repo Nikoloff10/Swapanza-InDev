@@ -107,26 +107,3 @@ def check_expired_swapanzas():
     
     return f"Reset {session_count} expired Swapanza sessions and {chat_count} chat Swapanzas. Affected {len(affected_users)} users."
 
-
-@shared_task
-def cleanup_stale_swapanza_requests():
-    """Clean up stale Swapanza requests"""
-    two_minutes_ago = timezone.now() - timezone.timedelta(minutes=2)
-    
-    # Find chats with stale requests
-    stale_chats = Chat.objects.filter(
-        swapanza_requested_by__isnull=False,
-        swapanza_active=False,  # Only non-active Swapanzas
-        swapanza_requested_at__lt=two_minutes_ago
-    )
-    
-    # Reset these requests
-    count = stale_chats.count()
-    if count > 0:
-        print(f"Cleaning up {count} stale Swapanza requests")
-        stale_chats.update(
-            swapanza_requested_by=None,
-            swapanza_confirmed_users=[]
-        )
-    
-    return f"Cleaned up {count} stale Swapanza requests"

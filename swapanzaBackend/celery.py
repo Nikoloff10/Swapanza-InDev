@@ -16,16 +16,10 @@ app.autodiscover_tasks()
 
 # Define the beat schedule directly here (in addition to what's in settings)
 app.conf.beat_schedule = {
-    # This task will run every 60 seconds to check for expired Swapanza sessions
+    # This task will run every 10 seconds to check for expired Swapanza sessions
     'check-expired-swapanzas': {
         'task': 'chat.tasks.check_expired_swapanzas',
-        'schedule': 60.0,  # Run every 60 seconds
-    },
-    
-    # Add this new task to clean up stale Swapanza requests
-    'cleanup-stale-swapanza-requests': {
-        'task': 'chat.tasks.cleanup_stale_swapanza_requests',
-        'schedule': 60.0,  # Run every minute
+        'schedule': 10.0,  # Run every 10 seconds for faster detection
     },
 }
 

@@ -17,100 +17,7 @@ function ChatList({ logout, username }) {
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const searchTimeoutRef = useRef(null);
   const navigate = useNavigate();
-  const [swapanzaInvites, setSwapanzaInvites] = useState([]);
-  const [showSwapanzaInvites, setShowSwapanzaInvites] = useState(false);
-
-  const acceptInvite = async (inviteId) => {
-    try {
-      // First check if user is already in an active Swapanza
-      const checkResponse = await axios.get("/api/can-start-swapanza/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
   
-      if (!checkResponse.data.can_start) {
-        alert(
-          checkResponse.data.reason ||
-            "You cannot accept a Swapanza invitation at this time"
-        );
-        return;
-      }
-  
-      // Find the invite before removing it
-      const invite = swapanzaInvites.find(inv => inv.id === inviteId);
-      if (!invite) {
-        alert("Invitation not found.");
-        return;
-      }
-      
-      // If allowed, proceed with accepting the invitation
-      const response = await axios.post(
-        `/api/swapanza/accept/${inviteId}/`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      
-      // Update localStorage to remove this specific invitation
-      const storedInvites = JSON.parse(localStorage.getItem('swapanzaInvites') || '[]');
-      const updatedInvites = storedInvites.filter(inv => inv.id !== inviteId);
-      localStorage.setItem('swapanzaInvites', JSON.stringify(updatedInvites));
-      
-      // Remove from state
-      setSwapanzaInvites(prev => prev.filter(inv => inv.id !== inviteId));
-      
-      // Determine which chat to open
-      let chatIdToOpen;
-      if (response.data && response.data.chat_id) {
-        chatIdToOpen = response.data.chat_id;
-      } else if (invite.chat_id) {
-        chatIdToOpen = invite.chat_id;
-      } else {
-        alert("Could not determine which chat to open. Please find the chat manually.");
-        setShowSwapanzaInvites(false);
-        return;
-      }
-      
-      // Make sure chat is visible by removing from closed chats if necessary
-      const closedChatIds = getClosedChatIds();
-      if (closedChatIds.includes(chatIdToOpen.toString())) {
-        const newClosedChats = closedChatIds.filter(id => id !== chatIdToOpen.toString());
-        localStorage.setItem('closedChats', JSON.stringify(newClosedChats));
-        
-        // Refresh chats to show the reopened chat
-        fetchChats();
-      }
-      
-      // Open the chat modal
-      openModal(chatIdToOpen);
-      setShowSwapanzaInvites(false);
-      
-      alert("Swapanza invite accepted! Please confirm in the chat to activate Swapanza.");
-    } catch (error) {
-      console.error("Error accepting Swapanza invite:", error);
-      alert("Failed to accept invite. Please try again.");
-    }
-  };
-
-  const declineInvite = async (inviteId) => {
-    try {
-      await axios.post(
-        `/api/swapanza/decline/${inviteId}/`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setSwapanzaInvites((prev) =>
-        prev.filter((invite) => invite.id !== inviteId)
-      );
-      alert("Swapanza invite declined.");
-    } catch (error) {
-      console.error("Error declining Swapanza invite:", error);
-      alert("Failed to decline invite. Please try again.");
-    }
-  };
-
   const handleProfileClick = () => {
     navigate("/profile");
   };
@@ -132,35 +39,6 @@ function ChatList({ logout, username }) {
   useEffect(() => {
     fetchCurrentUserProfile();
   }, [fetchCurrentUserProfile]);
-
-  useEffect(() => {
-    // Load and clean up Swapanza invitations on component mount
-    try {
-      const storedInvites = JSON.parse(localStorage.getItem('swapanzaInvites') || '[]');
-      
-      // Filter out invitations older than 30 minutes
-      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-      const validInvites = storedInvites.filter(invite => {
-        if (invite.timestamp) {
-          const inviteTime = new Date(invite.timestamp);
-          return inviteTime > thirtyMinutesAgo;
-        }
-        return false;
-      });
-      
-      // Update localStorage and state
-      if (validInvites.length !== storedInvites.length) {
-        localStorage.setItem('swapanzaInvites', JSON.stringify(validInvites));
-      }
-      
-      if (validInvites.length > 0) {
-        setSwapanzaInvites(validInvites);
-      }
-    } catch (e) {
-      console.error("Error loading Swapanza invites:", e);
-      localStorage.setItem('swapanzaInvites', JSON.stringify([]));
-    }
-  }, []);
 
   // Get IDs of closed chats from localStorage
   const getClosedChatIds = useCallback(() => {
@@ -501,79 +379,6 @@ function ChatList({ logout, username }) {
         </div>
 
         <div className="flex items-center">
-          {/* Add Swapanza notification indicator */}
-          {swapanzaInvites.length > 0 && (
-            <div className="relative mr-4">
-              <button
-                onClick={() => setShowSwapanzaInvites(!showSwapanzaInvites)}
-                className="p-2 bg-purple-100 rounded-full hover:bg-purple-200 focus:outline-none relative"
-              >
-                <span className="text-purple-600">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M20 4h-4V2a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-                    <path d="M2 13h20v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9z" />
-                    <path d="M12 7v13" />
-                    <path d="M8 15l4 4 4-4" />
-                  </svg>
-                </span>
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {swapanzaInvites.length}
-                </span>
-              </button>
-
-              {showSwapanzaInvites && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
-                  <div className="p-3 border-b border-gray-200 font-medium">
-                    Swapanza Invitations
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {swapanzaInvites.map((invite) => (
-                      <div
-                        key={invite.id}
-                        className="p-3 border-b border-gray-100"
-                      >
-                        <div className="mb-2">
-                          <span className="font-medium">{invite.from}</span>{" "}
-                          invited you to swap profiles for{" "}
-                          <span className="font-medium">
-                            {invite.duration} min
-                          </span>
-                        </div>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => acceptInvite(invite.id)}
-                            className="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600"
-                          >
-                            Accept
-                          </button>
-                          <button
-                            onClick={() => declineInvite(invite.id)}
-                            className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {swapanzaInvites.length === 0 && (
-                      <div className="p-4 text-gray-500 text-center">
-                        No pending Swapanza invitations
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Profile button */}
           <button
             onClick={handleProfileClick}

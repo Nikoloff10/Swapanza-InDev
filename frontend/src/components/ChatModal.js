@@ -24,7 +24,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const wsRetryCount = useRef(0);
   const token = localStorage.getItem("token");
 
-  const [swapanzaInvites, setSwapanzaInvites] = useState([]);
+  // Remove the swapanzaInvites state variable
   const [swapanzaPartner, setSwapanzaPartner] = useState(null);
 
   // Swapanza states:
@@ -162,39 +162,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
     return () => clearInterval(intervalId);
   }, [fetchGlobalSwapanzaState]);
-
-  useEffect(() => {
-    try {
-      const storedInvites = JSON.parse(
-        localStorage.getItem("swapanzaInvites") || "[]"
-      );
-
-      // Filter out invitations older than 30 minutes
-      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-      const validInvites = storedInvites.filter((invite) => {
-        // Check if timestamp exists and is valid
-        if (invite.timestamp) {
-          const inviteTime = new Date(invite.timestamp);
-          return inviteTime > thirtyMinutesAgo;
-        }
-        return false; // Remove invites without valid timestamps
-      });
-
-      // Update localStorage with cleaned invites
-      if (validInvites.length !== storedInvites.length) {
-        localStorage.setItem("swapanzaInvites", JSON.stringify(validInvites));
-      }
-
-      if (validInvites.length > 0) {
-        setSwapanzaInvites(validInvites);
-      }
-    } catch (e) {
-      console.error("Error managing Swapanza invitations:", e);
-      // Reset to empty array if there's an error
-      localStorage.setItem("swapanzaInvites", JSON.stringify([]));
-      setSwapanzaInvites([]);
-    }
-  }, []);
 
   useEffect(() => {
     if (isSwapanzaActive && swapanzaEndTime) {
@@ -422,58 +389,20 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const handleSwapanzaRequest = useCallback(
     (data) => {
       const isYou = Number(data.requested_by) === Number(currentUserId);
-
+  
       setIsSwapanzaRequested(true);
       setSwapanzaDuration(data.duration);
       setSwapanzaRequestedBy(isYou ? "you" : data.requested_by);
       setSwapanzaRequestedByUsername(data.requested_by_username);
-
+  
+      // Show the Swapanza modal only if you're the recipient
       if (!isYou) {
-        // Add to swapanza invites if you're the recipient
-        const newInvite = {
-          id: Date.now(), // temporary ID
-          from: data.requested_by_username,
-          duration: data.duration,
-          timestamp: new Date(),
-          chat_id: chatId, // Add the chat ID to the invite
-          requested_by: data.requested_by,
-        };
-
-        // Use a global state or localStorage to store invitations across components
-        const existingInvites = JSON.parse(
-          localStorage.getItem("swapanzaInvites") || "[]"
-        );
-        const updatedInvites = [...existingInvites, newInvite];
-        localStorage.setItem("swapanzaInvites", JSON.stringify(updatedInvites));
-
-        setSwapanzaInvites((prev) => [...prev, newInvite]);
-
-        // Show the Swapanza modal automatically when receiving an invitation
         setShowSwapanzaModal(true);
-
-        // If browser notifications are supported and permitted
-        if ("Notification" in window) {
-          if (Notification.permission === "granted") {
-            new Notification("Swapanza Invitation", {
-              body: `${data.requested_by_username} has invited you to swap profiles for ${data.duration} minutes!`,
-              icon: "/logo.png", // Add your logo
-            });
-          } else if (Notification.permission !== "denied") {
-            Notification.requestPermission().then((permission) => {
-              if (permission === "granted") {
-                new Notification("Swapanza Invitation", {
-                  body: `${data.requested_by_username} has invited you to swap profiles for ${data.duration} minutes!`,
-                  icon: "/logo.png",
-                });
-              }
-            });
-          }
-        }
       }
     },
-    [currentUserId, chatId]
+    [currentUserId]
   );
-
+  
   // Function to handle Swapanza confirmation
   const handleSwapanzaConfirm = useCallback(
     (data) => {
@@ -510,37 +439,32 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const handleSwapanzaActivate = useCallback(
     (data) => {
       console.log("Swapanza activated:", data);
-
+  
       // Close modal when Swapanza activates
       setShowSwapanzaModal(false);
-
+  
       const startedAt = new Date(data.started_at);
       const endsAt = new Date(data.ends_at);
-
+  
       setSwapanzaStartTime(startedAt);
       setSwapanzaEndTime(endsAt);
       setIsSwapanzaActive(true);
-
-      // Set remaining messages if provided by server, otherwise use default value
+  
+      // Set remaining messages if provided
       if (
         data.remaining_messages !== undefined &&
         data.remaining_messages !== null
       ) {
         setRemainingMessages(Math.max(data.remaining_messages, 0));
-        console.log(
-          "Setting remaining messages from activation to:",
-          data.remaining_messages
-        );
       } else {
-        // Default to 2 messages if not specified by server
         setRemainingMessages(2);
       }
-
+  
       // Clear confirmation state
       setUserConfirmedSwapanza(false);
       setPartnerConfirmedSwapanza(false);
-
-      // If we have partner info, use it
+  
+      // Set swapanzaPartner info
       if (data.partner_id && data.partner_username) {
         setSwapanzaPartner({
           id: data.partner_id,
@@ -560,31 +484,31 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
           });
         }
       }
-
+  
       // Start countdown timer
       if (swapanzaTimeLeftRef.current) {
         clearInterval(swapanzaTimeLeftRef.current);
       }
-
+  
       const updateTimeLeft = () => {
         const now = new Date();
         const diff = Math.max(0, Math.floor((endsAt - now) / 1000));
         setTimeLeft(diff);
-
+  
         if (diff <= 0) {
           clearInterval(swapanzaTimeLeftRef.current);
           swapanzaTimeLeftRef.current = null;
-
+  
           // Reset Swapanza when timer expires
           if (resetSwapanzaRef.current) {
             resetSwapanzaRef.current();
           }
         }
       };
-
+  
       updateTimeLeft();
       swapanzaTimeLeftRef.current = setInterval(updateTimeLeft, 1000);
-
+  
       // Store minimal state in localStorage
       localStorage.setItem(
         `swapanza_active_${chatId}`,
@@ -646,6 +570,36 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
     // Define the WebSocket setup function
     const setupWebSocket = () => {
+      // Check if token is expired before attempting connection
+      try {
+        // Try to decode token to check expiration
+        const payloadBase64 = token.split('.')[1];
+        if (!payloadBase64) {
+          console.log("Invalid token format, redirecting to login");
+          window.location.href = '/login';
+          return;
+        }
+        
+        const payload = JSON.parse(atob(payloadBase64));
+        if (payload.exp) {
+          const expirationTime = payload.exp * 1000; // Convert to milliseconds
+          const currentTime = Date.now();
+          
+          if (currentTime >= expirationTime) {
+            console.log("Token expired, redirecting to login");
+            localStorage.clear();
+            window.location.href = '/login';
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Error checking token expiration:", e);
+        // If there's an error parsing the token, it's likely invalid
+        localStorage.clear();
+        window.location.href = '/login';
+        return;
+      }
+
       if (ws.current?.readyState === WebSocket.OPEN) {
         ws.current.close();
       }
@@ -719,19 +673,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
                 break;
               case "swapanza.activate":
                 console.log("Received swapanza activation message:", data);
-                // Clear invitations
-                const invites = JSON.parse(
-                  localStorage.getItem("swapanzaInvites") || "[]"
-                );
-                const filteredInvites = invites.filter(
-                  (invite) => Number(invite.chat_id) !== Number(chatId)
-                );
-                localStorage.setItem(
-                  "swapanzaInvites",
-                  JSON.stringify(filteredInvites)
-                );
-                setSwapanzaInvites(filteredInvites);
-
                 handleSwapanzaActivate(data);
                 break;
               case "swapanza.expire":
@@ -1399,21 +1340,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
                   ? otherParticipant.username
                   : "Chat"}
               </h2>
-              {swapanzaInvites.length > 0 && (
-                <div className="flex items-center">
-                  <span className="animate-pulse inline-block h-3 w-3 rounded-full bg-purple-600 mr-2"></span>
-                  <span className="text-sm text-purple-600 font-medium">
-                    {swapanzaInvites.length} Swapanza invitation
-                    {swapanzaInvites.length !== 1 ? "s" : ""} pending
-                  </span>
-                  <button
-                    onClick={() => setShowSwapanzaModal(true)}
-                    className="ml-2 text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full hover:bg-purple-700"
-                  >
-                    View
-                  </button>
-                </div>
-              )}
             </div>
           </div>
           <div className="flex items-center">

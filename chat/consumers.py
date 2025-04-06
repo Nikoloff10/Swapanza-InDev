@@ -76,6 +76,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.user_group_name,
                 self.channel_name
             )
+        
+        # Clear any pending Swapanza request if the user is the requester
+        await self.clear_pending_swapanza_request()
 
     # Receive message from WebSocket
     async def receive(self, text_data):
@@ -534,14 +537,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             chat = Chat.objects.get(id=self.chat_id)
             
-            # Check if Swapanza request exists
-            if not chat.swapanza_requested_by:
-                return False, "No Swapanza request exists", False
-            
-            # Check if Swapanza is already active
-            if chat.swapanza_active:
-                return False, "Swapanza is already active", False
-            
             # Get confirmed users list
             confirmed_users = chat.swapanza_confirmed_users or []
             
@@ -736,6 +731,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def swapanza_logout(self, event):
         """Send Swapanza logout notification to WebSocket"""
+        # Only send if the WebSocket is still open
+        if self.scope['session'].get('already_logging_out'):
+            # Skip sending another logout notification
+            return
+            
+        # Mark this session as already logging out
+        self.scope['session']['already_logging_out'] = True
+        
         # Force the client to disconnect and redirect to login
         await self.send(text_data=json.dumps({
             'type': 'swapanza.logout',
@@ -945,4 +948,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         return all_confirmed, confirmed_users, len(participants)
 
-    
+    @database_sync_to_async
+    def clear_pending_swapanza_request(self):
+        """Clear any pending Swapanza request for this chat when a user disconnects"""
+        try:
+            chat = Chat.objects.get(id=self.chat_id)
+            
+            # Only clear if there's a pending request (not active Swapanza)
+            if chat.swapanza_requested_by and not chat.swapanza_active:
+                # Check if the requester is the current user
+                if chat.swapanza_requested_by.id == self.user.id:
+                    print(f"Clearing pending Swapanza request from {self.user.username} in chat {self.chat_id}")
+                    chat.swapanza_requested_by = None
+                    chat.swapanza_confirmed_users = []
+                    chat.save(update_fields=['swapanza_requested_by', 'swapanza_confirmed_users'])
+                    return True
+                    
+            return False
+        except Exception as e:
+            print(f"Error clearing pending Swapanza request: {str(e)}")
+            return False
+

@@ -606,14 +606,31 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   }, []);
 
   const handleSwapanzaLogout = useCallback(() => {
-    console.log("Received Swapanza logout notification");
-    // Clear all local storage and redirect to login
-    localStorage.clear();
-    alert(
-      "Your Swapanza session has expired. You will be redirected to login."
-    );
+    console.log("Received Swapanza logout notification - forcing logout");
+    
+    // Clear all storage
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("username"); 
+    localStorage.removeItem("activeSwapanza");
+    
+    // Clear any chat-specific Swapanza data
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith("swapanza_active_")) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Show a message (optional)
+    alert("Your Swapanza session has expired. You will be redirected to login.");
+    
+    // Force a hard redirect to login page (no client-side routing)
     window.location.href = "/login";
   }, []);
+  
+  // In the websocket message handler:
+  
 
   // Function to handle server errors
   const handleServerError = useCallback((data) => {

@@ -69,6 +69,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.chat_group_name,
             self.channel_name
         )
+        
+        # Also leave personal user channel
+        if hasattr(self, 'user_group_name'):
+            await self.channel_layer.group_discard(
+                self.user_group_name,
+                self.channel_name
+            )
 
     # Receive message from WebSocket
     async def receive(self, text_data):
@@ -675,7 +682,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def swapanza_expire(self, event):
         """Notify WebSocket that Swapanza has expired"""
         await self.send(text_data=json.dumps({
-            'type': 'swapanza.expire'
+            'type': 'swapanza.expire',
+            'force_redirect': True
         }))
         
         # Clean up the Swapanza sessions
@@ -683,9 +691,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def swapanza_logout(self, event):
         """Send Swapanza logout notification to WebSocket"""
+        # Force the client to disconnect and redirect to login
         await self.send(text_data=json.dumps({
-            'type': 'swapanza.logout'
+            'type': 'swapanza.logout',
+            'force_redirect': True  # Add this flag to ensure the client acts on it
         }))
+        
+        # Close the WebSocket connection immediately to ensure the client reconnects with new credentials
+        await self.close(code=4000)  # Use a special code to indicate forced logout
     
     @database_sync_to_async
     def deactivate_swapanza_sessions(self):

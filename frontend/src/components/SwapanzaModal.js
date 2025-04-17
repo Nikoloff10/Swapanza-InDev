@@ -1,4 +1,3 @@
-// Remove the auto-confirmation effect completely
 import React, { useState, useEffect, useRef } from 'react';
 
 function SwapanzaModal({
@@ -39,7 +38,7 @@ function SwapanzaModal({
     };
   }, [isOpen, onClose]);
   
-  // Removed the auto-confirm effect completely
+  // We've completely removed the auto-confirm effect
   
   if (!isOpen) return null;
   

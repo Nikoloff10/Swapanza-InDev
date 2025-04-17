@@ -326,7 +326,20 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       const refreshToken = localStorage.getItem("refreshToken");
       if (!refreshToken) {
         console.error("No refresh token available");
-        localStorage.clear(); // Clear all tokens
+        // Standardize cleanup - clear all auth data
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("username");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("activeSwapanza");
+        
+        // Clear any chat-specific Swapanza data
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith("swapanza_active_")) {
+            localStorage.removeItem(key);
+          }
+        });
+        
         window.location.href = "/login";
         return false;
       }
@@ -359,13 +372,38 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         return true;
       }
       console.error("Token refresh failed - no access token in response");
-      localStorage.clear();
+      // Standardize cleanup here too
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("username");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("activeSwapanza");
+      
+      // Clear any chat-specific Swapanza data
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith("swapanza_active_")) {
+          localStorage.removeItem(key);
+        }
+      });
+      
       window.location.href = "/login";
       return false;
     } catch (error) {
       console.error("Error refreshing token:", error);
-      // Clear all tokens if refresh fails
-      localStorage.clear();
+      // Standardize cleanup here too
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("username");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("activeSwapanza");
+      
+      // Clear any chat-specific Swapanza data
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith("swapanza_active_")) {
+          localStorage.removeItem(key);
+        }
+      });
+      
       // Show a user-friendly message
       alert("Your session has expired. Please log in again.");
       window.location.href = "/login";
@@ -532,8 +570,9 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const handleSwapanzaLogout = useCallback(() => {
     console.log("Received Swapanza logout notification - forcing logout");
 
-    // Clear all storage
+    // Clear all storage - add refreshToken to ensure complete cleanup
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");  // Added missing refreshToken cleanup
     localStorage.removeItem("userId");
     localStorage.removeItem("username");
     localStorage.removeItem("activeSwapanza");
@@ -1283,8 +1322,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     return null;
   };
 
-  const bothUsersConfirmed = userConfirmedSwapanza;
-
   if (loading)
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
@@ -1415,12 +1452,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         </div>
 
         {renderSwapanzaSection()}
-
-        {bothUsersConfirmed && (
-          <div className="p-2 bg-green-100 text-center text-green-800 text-sm">
-            Both users have confirmed! Starting Swapanza...
-          </div>
-        )}
 
         <div className="border-t p-2 flex">
           <input

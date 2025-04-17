@@ -506,7 +506,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         chat.swapanza_confirmed_users = []
                         # Continue with the new request
                     else:
-                        return False, "A Swapanza request is already pending"
+                        # Enhanced error message for concurrent request situation
+                        # If the current user is NOT the requester, indicate who made the request
+                        if chat.swapanza_requested_by.id != self.user.id:
+                            return False, f"A Swapanza request by {chat.swapanza_requested_by.username} is already pending. Please wait for it to expire or ask them to withdraw their request."
+                        # If the current user IS the requester, indicate they already have a pending request
+                        else:
+                            return False, "You already have a pending Swapanza request in this chat"
                 else:
                     # If there's no timestamp, it's likely an old request (pre-feature)
                     # Go ahead and reset it

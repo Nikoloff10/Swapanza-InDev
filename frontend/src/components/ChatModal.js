@@ -841,6 +841,12 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
               Number(p.id) === Number(chatResponse.data.swapanza_requested_by)
           );
           setSwapanzaRequestedByUsername(requester?.username || "Unknown");
+          
+          // Show the SwapanzaModal to the recipient when chat is opened with a pending request
+          setShowSwapanzaModal(true);
+        } else {
+          // For the requester, set their own username
+          setSwapanzaRequestedByUsername(localStorage.getItem("username") || "You");
         }
 
         // Check if current user has already confirmed
@@ -871,9 +877,10 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       if (hasActiveGlobalSwapanza) {
         setIsSwapanzaActive(true);
         setSwapanzaEndTime(new Date(swapanzaResponse.data.ends_at));
+        setSwapanzaStartTime(new Date(swapanzaResponse.data.started_at));
 
         // Correctly initialize the remaining messages (2 - count used)
-        const remainingMsgs = 2 - swapanzaResponse.data.message_count;
+        const remainingMsgs = swapanzaResponse.data.remaining_messages;
         setRemainingMessages(remainingMsgs);
         console.log("Setting remaining messages to:", remainingMsgs);
 
@@ -887,6 +894,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         // If not in global swapanza but this chat has active swapanza
         setIsSwapanzaActive(true);
         setSwapanzaEndTime(new Date(chatResponse.data.swapanza_ends_at));
+        setSwapanzaStartTime(new Date(chatResponse.data.swapanza_started_at));
 
         // Get message count for current user
         const userId = localStorage.getItem("userId");
@@ -896,7 +904,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
         // Find the other participant to set as swapanzaPartner
         const otherUser = chatResponse.data.participants.find(
-          (p) => Number(p.id) !== Number(userId)
+          (p) => Number(p.id) !== Number(currentUserId)
         );
 
         if (otherUser) {

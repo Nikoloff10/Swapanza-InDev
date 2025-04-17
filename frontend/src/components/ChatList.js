@@ -236,23 +236,48 @@ function ChatList({ logout, username }) {
     if (!token) return;
 
     try {
+      // Get chats that aren't marked as closed
+      const closedChatIds = getClosedChatIds();
+      
+      // Fetch all chats regardless of closed status to check for Swapanza invites
       const response = await axios.get("/api/chats/", {
         headers: { Authorization: `Bearer ${token}` },
+        params: { include_closed: true }
       });
 
-      // Get closed chats
-      const closedChatIds = getClosedChatIds();
-
-      // Filter out closed chats
-      const filteredChats = response.data.filter(
+      console.log("Fetched chats:", response.data);
+      
+      // Filter out closed chats for display
+      const visibleChats = response.data.filter(
         (chat) => !closedChatIds.includes(chat.id.toString())
       );
 
-      setChats(filteredChats);
+      // Check for any pending Swapanza invites in closed chats
+      const swapanzaInvites = response.data.filter(
+        (chat) => 
+          closedChatIds.includes(chat.id.toString()) && // Chat is closed
+          chat.swapanza_requested_by && // Has a Swapanza request
+          !chat.swapanza_active && // Not already active
+          Number(chat.swapanza_requested_by) !== Number(currentUserId) // Not requested by current user
+      );
+
+      // Add Swapanza invites to unread counts for notification
+      if (swapanzaInvites.length > 0) {
+        const newUnreadCounts = {...unreadCounts};
+        
+        swapanzaInvites.forEach(chat => {
+          // Mark as special Swapanza notification with -1 value
+          newUnreadCounts[chat.id] = -1; // Special value to indicate Swapanza invite
+        });
+        
+        setUnreadCounts(newUnreadCounts);
+      }
+
+      setChats(visibleChats);
     } catch (error) {
-      console.error("Error fetching chats:", error);
+      console.error("Error fetching chats:", error.response || error);
     }
-  }, [token, getClosedChatIds]);
+  }, [token, getClosedChatIds, currentUserId, unreadCounts]);
 
   useEffect(() => {
     fetchChats();
@@ -420,9 +445,14 @@ function ChatList({ logout, username }) {
                       const chat = chats.find(
                         (c) => c.id.toString() === chatId
                       );
-                      const otherUser = chat?.participants?.find(
+                      
+                      // For hidden chats with Swapanza invites, we need to fetch from server or look at the full response
+                      let otherUser = chat?.participants?.find(
                         (p) => Number(p.id) !== Number(currentUserId)
                       );
+
+                      // Special handling for Swapanza invites (count === -1)
+                      const isSwapanzaInvite = count === -1;
 
                       return (
                         <div
@@ -437,8 +467,8 @@ function ChatList({ logout, username }) {
                             <span className="font-medium">
                               {otherUser?.username || "Unknown"}
                             </span>
-                            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">
-                              {count} {count === 1 ? "message" : "messages"}
+                            <span className={`${isSwapanzaInvite ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'} text-xs font-medium px-2 py-0.5 rounded`}>
+                              {isSwapanzaInvite ? 'Swapanza Invite' : `${count} ${count === 1 ? "message" : "messages"}`}
                             </span>
                           </div>
                         </div>

@@ -100,16 +100,20 @@ pip install -r requirements.txt
 
 4. Set up environment variables (create a .env file in the project root):
 ```
-DEBUG=True
-SECRET_KEY=your_secret_key
-DATABASE_URL=postgresql://user:password@localhost/dbname
-
-REDIS_URL=redis://localhost:6379/1 # Adjust if your Redis runs elsewhere
-
-# Cloudinary Credentials (Get from your Cloudinary account)
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+CLOUDINARY_CLOUD_NAME=''
+CLOUDINARY_API_KEY=''
+CLOUDINARY_API_SECRET=''
+DJANGO_SETTINGS_MODULE=swapanzaBackend.settings
+REACT_APP_API_URL=http://localhost:8000
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+DJANGO_SECRET_KEY=''
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:8000
+DATABASE_URL=''
+REDIS_URL=redis://127.0.0.1:6379/1
+CORS_ALLOW_ALL_ORIGINS=True
 ```
 
 5. Run migrations:

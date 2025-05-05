@@ -6,11 +6,10 @@ import ChatList from './components/ChatList';
 import Profile from './components/Profile';
 import Home from './components/Home';
 import { setupTokenExpirationChecker, validateToken } from './utils/tokenUtils';
-// Import our axios config to ensure interceptors are set up
 import './utils/axiosConfig';
 
 
-// Create a component that scrolls to top on navigation
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   

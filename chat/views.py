@@ -20,7 +20,7 @@ from rest_framework import filters, pagination
 User = get_user_model()
 
 
-# Add this view for profile image upload
+
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -29,7 +29,7 @@ def upload_profile_image(request, user_id):
     """
     Upload a profile image to Cloudinary
     """
-    # Only allow users to update their own profile
+    
     if str(request.user.id) != str(user_id):
         return Response({"detail": "Not authorized"},
                         status=status.HTTP_403_FORBIDDEN)
@@ -42,14 +42,14 @@ def upload_profile_image(request, user_id):
     image = request.FILES['profile_image']
 
     try:
-        # Upload to Cloudinary
+        
         upload_result = cloudinary.uploader.upload(image,
                                                    folder="swapanza_profiles",
                                                    public_id=f"user_{user.id}",
                                                    overwrite=True,
                                                    resource_type="image")
 
-        # Save the Cloudinary URL to the user profile
+        
         user.profile_image_url = upload_result['secure_url']
         user.save()
 
@@ -72,7 +72,7 @@ def user_profile(request, user_id=None):
     else:
         user = request.user
 
-    # Only allow users to update their own profile
+    
     if request.method == 'PUT' and str(request.user.id) != str(user_id):
         return Response({"detail": "Not authorized"},
                         status=status.HTTP_403_FORBIDDEN)
@@ -107,7 +107,7 @@ def find_chat_by_user(request, user_id):
     Find an existing chat between the current user and the specified user
     """
     try:
-        # Find chats where both users are participants
+        
         other_user = get_object_or_404(User, id=user_id)
         chat = Chat.objects.filter(participants=request.user).filter(
             participants=other_user).first()
@@ -163,10 +163,10 @@ class UserListView(generics.ListAPIView):
         search = self.request.query_params.get('search', None)
 
         if search:
-            # Match even partial usernames - make search more generous
+            
             queryset = queryset.filter(username__icontains=search)
 
-        # Limit to 10 results for performance
+        
         return queryset[:10]
 
 
@@ -199,9 +199,9 @@ def unread_message_counts(request):
 
     unread_counts = {}
     for chat in chats:
-        # Use read_by instead of seen field
+        
         count = Message.objects.filter(chat=chat).exclude(
-            read_by=user  # Use the ManyToMany relationship instead of seen field
+            read_by=user  
         ).exclude(sender=user).count()
 
         if count > 0:
@@ -245,7 +245,7 @@ class ChatDetailView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(instance)
         data = serializer.data
 
-        # Add Swapanza information
+        
         now = timezone.now()
         swapanza_active = False
 
@@ -302,14 +302,14 @@ def reset_notifications(request):
     """Reset all unread messages for the user"""
     user = request.user
 
-    # Get all chats the user is part of
+    
     chats = Chat.objects.filter(participants=user)
 
-    # For each chat, mark messages as read
+    
     total_updated = 0
     for chat in chats:
         unread_messages = Message.objects.filter(chat=chat).exclude(
-            read_by=user  # Use read_by instead of seen
+            read_by=user  
         ).exclude(sender=user)
 
         for message in unread_messages:
@@ -331,10 +331,10 @@ def get_active_swapanza(request):
     user = request.user
     now = timezone.now()
 
-    # Get chat_id if provided in the request
+    
     chat_id = request.query_params.get('chat_id')
 
-    # Check for active session
+    
     active_session = SwapanzaSession.objects.filter(user=user,
                                                     active=True,
                                                     ends_at__gt=now).first()
@@ -342,11 +342,11 @@ def get_active_swapanza(request):
     if not active_session:
         return Response({'active': False})
 
-    # Get partner information
+    
     partner = active_session.partner
     session_chat = active_session.chat
 
-    # Calculate chat-specific message count for UI feedback
+    
     chat_specific_count = 0
     if chat_id:
         try:
@@ -356,13 +356,13 @@ def get_active_swapanza(request):
         except Chat.DoesNotExist:
             pass
 
-    # Calculate TOTAL messages across ALL chats for this Swapanza session
+    
     total_message_count = Message.objects.filter(
         sender=user,
         during_swapanza=True,
         created_at__gte=active_session.started_at).count()
 
-    # Use total count for remaining message calculation
+    
     remaining_messages = max(0, 2 - total_message_count)
 
     return Response({
@@ -397,7 +397,7 @@ def can_start_swapanza(request):
     user = request.user
     now = timezone.now()
 
-    # Check if user is already in an active Swapanza
+    
     active_session = SwapanzaSession.objects.filter(user=user,
                                                     active=True,
                                                     ends_at__gt=now).first()
@@ -410,26 +410,26 @@ def can_start_swapanza(request):
             'You are already in an active Swapanza session'
         })
 
-    # All checks passed
+    
     return Response({'can_start': True})
 
 
-# In ChatListView class (which handles /api/chats/):
+
 class ChatListView(generics.ListCreateAPIView):
     serializer_class = ChatSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Get user's chats
+        
         user = self.request.user
         queryset = Chat.objects.filter(participants=user).order_by('-id')
 
-        # Check if we want to include closed chats (for Swapanza invites)
+        
         include_closed = self.request.query_params.get(
             'include_closed', 'false').lower() == 'true'
 
         if not include_closed:
-            # Continue with normal behavior, all chats are returned
+            
             pass
 
         return queryset
@@ -439,13 +439,13 @@ class ChatListView(generics.ListCreateAPIView):
         serializer = self.get_serializer(queryset, many=True)
         data = serializer.data
 
-        # Add Swapanza request info to each chat
+        
         now = timezone.now()
 
         for chat_data in data:
             chat = Chat.objects.get(id=chat_data['id'])
 
-            # Add Swapanza request info if available
+            
             if chat.swapanza_requested_by:
                 chat_data[
                     'swapanza_requested_by'] = chat.swapanza_requested_by.id
@@ -456,7 +456,7 @@ class ChatListView(generics.ListCreateAPIView):
                         'swapanza_requested_at'] = chat.swapanza_requested_at.isoformat(
                         )
 
-            # Also include active Swapanza info
+            
             chat_data['swapanza_active'] = (chat.swapanza_active
                                             and chat.swapanza_ends_at
                                             and chat.swapanza_ends_at > now)

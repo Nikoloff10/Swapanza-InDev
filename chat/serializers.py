@@ -26,7 +26,7 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'sender']
 
     def create(self, validated_data):
-        # Pop extra kwargs provided via serializer.save(chat=..., sender=...)
+        
         chat = validated_data.pop('chat', None)
         sender = validated_data.pop('sender', None)
         return Message.objects.create(chat=chat, sender=sender, **validated_data)

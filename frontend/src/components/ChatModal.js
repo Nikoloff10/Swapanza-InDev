@@ -24,10 +24,10 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const wsRetryCount = useRef(0);
   const token = localStorage.getItem("token");
 
-  // Remove the swapanzaInvites state variable
+ 
   const [swapanzaPartner, setSwapanzaPartner] = useState(null);
 
-  // Swapanza states:
+ 
 
   const [swapanzaDuration, setSwapanzaDuration] = useState(5);
   const [showSwapanzaOptions, setShowSwapanzaOptions] = useState(false);
@@ -47,7 +47,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const pendingMessages = useRef([]);
   const [partnerConfirmedSwapanza, setPartnerConfirmedSwapanza] =
     useState(false);
-  // Create refs to store function references and avoid circular dependencies
+  
   const setupWebSocketRef = useRef(null);
   const refreshAuthTokenRef = useRef(null);
   const resetSwapanzaRef = useRef(null);
@@ -80,11 +80,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       }
     };
 
-    updateTimeLeft(); // Update immediately
+    updateTimeLeft(); 
     swapanzaTimeLeftRef.current = setInterval(updateTimeLeft, 1000);
   }, []);
 
-  // Function to reset Swapanza state
+  
   const resetSwapanza = useCallback(() => {
     setIsSwapanzaActive(false);
     setShowSwapanzaModal(false);
@@ -110,7 +110,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     try {
       const response = await axios.get("/api/active-swapanza/", {
         headers: { Authorization: `Bearer ${token}` },
-        params: { chat_id: chatId }, // Add chat_id to get chat-specific info
+        params: { chat_id: chatId },
       });
 
       if (response.data.active) {
@@ -153,7 +153,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     }
   }, [token, chatId, chat, resetSwapanza, setupSwapanzaTimer]);
 
-  // Add effect for periodic checking
+  
   useEffect(() => {
     fetchGlobalSwapanzaState();
 
@@ -202,7 +202,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Define the refreshAuthToken function
+  
   const refreshAuthToken = useCallback(async () => {
     try {
       const refreshToken = localStorage.getItem("refreshToken");
@@ -229,10 +229,10 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     }
   }, []);
 
-  // Store in ref
+  
   refreshAuthTokenRef.current = refreshAuthToken;
 
-  // Function to start Swapanza countdown
+  
   const startSwapanzaCountdown = useCallback((endTime) => {
     if (swapanzaTimeLeftRef.current) {
       clearInterval(swapanzaTimeLeftRef.current);
@@ -255,7 +255,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     }, 1000);
   }, []);
 
-  // Store in ref
+ 
   startSwapanzaCountdownRef.current = startSwapanzaCountdown;
 
   const handleChatMessage = useCallback(
@@ -290,7 +290,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
               pending: false,
             };
 
-            // Remove from pendingMessages ref
+            
             const pendingMsgIndex = pendingMessages.current.findIndex(
               (pm) => pm.content === message.content
             );
@@ -302,12 +302,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
             return updatedMessages;
           }
 
-          // If no pending message was found, add as a new message
+          
           return [...updatedMessages, message];
         });
 
-        // Note: We handle the remaining_messages update at the WebSocket level now
-        // to ensure it's always processed regardless of message format
+        
 
         if (Number(message.sender) !== Number(currentUserId)) {
           console.log("Calling onNewMessage callback");
@@ -372,7 +371,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         return true;
       }
       console.error("Token refresh failed - no access token in response");
-      // Standardize cleanup here too
+      
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("username");
@@ -390,7 +389,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       return false;
     } catch (error) {
       console.error("Error refreshing token:", error);
-      // Standardize cleanup here too
+      
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("username");
@@ -411,7 +410,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     }
   }, []);
 
-  // Function to handle messages read
+  
   const handleMessagesRead = useCallback(
     (data) => {
       console.log("Messages marked as read by user:", data.user_id);
@@ -473,7 +472,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     [currentUserId]
   );
 
-  // Complete handleSwapanzaActivate function
+  
   const handleSwapanzaActivate = useCallback(
     (data) => {
       console.log("Swapanza activated:", data);
@@ -570,9 +569,9 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   const handleSwapanzaLogout = useCallback(() => {
     console.log("Received Swapanza logout notification - forcing logout");
 
-    // Clear all storage - add refreshToken to ensure complete cleanup
+    
     localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");  // Added missing refreshToken cleanup
+    localStorage.removeItem("refreshToken");  
     localStorage.removeItem("userId");
     localStorage.removeItem("username");
     localStorage.removeItem("activeSwapanza");
@@ -594,7 +593,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     window.location.href = "/login";
   }, []);
 
-  // In the websocket message handler:
 
   // Function to handle server errors
   const handleServerError = useCallback((data) => {
@@ -602,7 +600,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     alert(`Error: ${data.message}`);
   }, []);
 
-  // Set up WebSocket connection to chat
+  
   // Set up WebSocket connection to chat
   useEffect(() => {
     if (!chatId || !token) return;
@@ -611,7 +609,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     const setupWebSocket = () => {
       // Check if token is expired before attempting connection
       try {
-        // Try to decode token to check expiration
+        
         const payloadBase64 = token.split('.')[1];
         if (!payloadBase64) {
           console.log("Invalid token format, redirecting to login");
@@ -621,7 +619,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         
         const payload = JSON.parse(atob(payloadBase64));
         if (payload.exp) {
-          const expirationTime = payload.exp * 1000; // Convert to milliseconds
+          const expirationTime = payload.exp * 1000; 
           const currentTime = Date.now();
           
           if (currentTime >= expirationTime) {
@@ -633,7 +631,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         }
       } catch (e) {
         console.error("Error checking token expiration:", e);
-        // If there's an error parsing the token, it's likely invalid
+        
         localStorage.clear();
         window.location.href = '/login';
         return;
@@ -765,7 +763,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
       }
     };
 
-    // Store the setup function in the ref
+    
     setupWebSocketRef.current = setupWebSocket;
 
     // Call the setup function
@@ -994,9 +992,9 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     scrollToBottom();
   }, [messages]);
 
-  // Add this function to your ChatModal component
+  
 
-  // Update axios error handling globally
+  
   useEffect(() => {
     // Add a response interceptor to handle 401 errors
     const interceptor = axios.interceptors.response.use(
@@ -1112,8 +1110,8 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         })
       );
 
-      // Let the server update our state
-      setUserConfirmedSwapanza(true); // Only update local UI
+      
+      setUserConfirmedSwapanza(true); 
     }
   };
 
@@ -1122,7 +1120,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
 
     const messageContent = newMessage.trim();
 
-    // Let the server handle all validation
+    
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(
         JSON.stringify({
@@ -1154,7 +1152,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
   // Render a message component with memoization
   // Update the MemoizedMessage component to use swapanzaPartner
   const MemoizedMessage = memo(({ msg, isCurrentUser, chat }) => {
-    // Debug output can stay
+    
     console.log("Message data:", {
       content: msg.content,
       isDuringSwapanza: msg.during_swapanza, 
@@ -1179,7 +1177,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
     // Determine which username to display
     let displayUsername, profileImage;
   
-    // SIMPLIFIED LOGIC FOR SWAPANZA MESSAGES
+   
     if (isDuringSwapanza) {
       if (isCurrentUser && swapanzaPartner) {
         // Current user's messages - show as partner
@@ -1187,7 +1185,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage }) {
         profileImage = swapanzaPartner.profile_image || null;
       } 
       else if (msg.apparent_sender_username) {
-        // FIXED: Always use apparent_sender_username if available
+        
         displayUsername = msg.apparent_sender_username;
         profileImage = msg.apparent_sender_profile_image || null;
       }

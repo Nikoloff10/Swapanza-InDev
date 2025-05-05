@@ -38,7 +38,7 @@ function SwapanzaModal({
     };
   }, [isOpen, onClose]);
   
-  // We've completely removed the auto-confirm effect
+
   
   if (!isOpen) return null;
   

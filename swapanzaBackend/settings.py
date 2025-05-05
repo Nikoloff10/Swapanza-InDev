@@ -15,23 +15,33 @@ from pathlib import Path
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+import dj_database_url 
+from dotenv import load_dotenv 
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+dotenv_path = os.path.join(BASE_DIR, '.env') 
+load_dotenv(dotenv_path=dotenv_path)
+
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-sh%pzqu4(zfuax&i(uglk&nhd5d#&4msx!+&l=_s$!%73*_s(l'
+# No default value - must be set in .env
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Explicitly check if the environment variable is set to 'True', default to False
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True' 
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# Must be set in .env, split by comma. Default to empty list if not set.
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+
+ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host] 
 
 
-# Application definition
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -84,26 +94,30 @@ WSGI_APPLICATION = 'swapanzaBackend.wsgi.application'
 ASGI_APPLICATION = 'swapanzaBackend.asgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+
+
+
+
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'swapanza',
-        'USER': 'postgres',
-        'PASSWORD': 'bakugan2005',
-        'HOST': 'localhost',
-        'PORT': '5432',
-
-    }
+    'default': dj_database_url.config(env='DATABASE_URL') 
 }
 
 
 
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
-CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['http://localhost:3000', 'http://localhost:8000']
+
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True' 
+CORS_ALLOW_CREDENTIALS = True 
+
+CSRF_TRUSTED_ORIGINS = os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',')
+
+CSRF_TRUSTED_ORIGINS = [origin for origin in CSRF_TRUSTED_ORIGINS if origin]
+
+
+if not CORS_ALLOW_ALL_ORIGINS:
+    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+    CORS_ALLOWED_ORIGINS = [origin for origin in CORS_ALLOWED_ORIGINS if origin]
+
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -111,8 +125,8 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
+
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -130,8 +144,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
+
+
 
 LANGUAGE_CODE = 'en-us'
 
@@ -143,21 +157,26 @@ USE_TZ = True
 
 AUTH_USER_MODEL = 'chat.User'
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
+
+
+
+
+
+REDIS_URL = os.environ.get('REDIS_URL') 
 
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
+            "hosts": [REDIS_URL] if REDIS_URL else [], 
         },
     },
 }
 
-# Celery settings
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+
+
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL') 
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND') 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -170,21 +189,29 @@ STATICFILES_DIRS = [
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 WHITENOISE_ROOT = os.path.join(BASE_DIR, 'frontend', 'build')
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
+
+
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME', '')
-CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY', '')
-CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', '')
 
-cloudinary.config(
-    cloud_name=CLOUDINARY_CLOUD_NAME,
-    api_key=CLOUDINARY_API_KEY,
-    api_secret=CLOUDINARY_API_SECRET,
-    secure=True
-)
+
+CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME') 
+CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY') 
+CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET') 
+
+
+if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True
+    )
+else:
+    
+    print("Warning: Cloudinary credentials not fully configured in environment variables.")
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

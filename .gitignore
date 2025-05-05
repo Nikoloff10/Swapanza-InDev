@@ -84,3 +84,40 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 .eslintcache
+
+# Celery
+celerybeat-schedule
+celerybeat-schedule.bak
+celerybeat-schedule.dat
+celerybeat-schedule.dir
+celerybeat-schedule-shm
+celerybeat-schedule-wal
+celerybeat.pid
+
+# Virtual environment folders
+__pypackages__/
+.python-version
+
+# Local PostgreSQL files
+*.dump
+
+# Cache files
+.cache/
+.parcel-cache/
+
+# Redis dump
+*.rdb
+dump.rdb
+
+# Any secrets files
+secrets.*
+*_secrets.*
+
+# Frontend build artifacts
+frontend/build/
+
+# Any additional environment files
+.envrc
+
+# Explicitly ignore .env file at root
+/.env

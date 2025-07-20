@@ -2,6 +2,10 @@
 import axios from 'axios';
 import { isTokenExpired, redirectToLogin } from './tokenUtils';
 
+// Set the base URL for all API requests
+const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+axios.defaults.baseURL = apiUrl;
+
 // Check if we're already on an auth page (login or register)
 const isOnAuthPage = () => {
   const path = window.location.pathname;

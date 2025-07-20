@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
-const apiUrl = process.env.REACT_APP_API_URL 
+const apiUrl = process.env.REACT_APP_API_URL;
 
 function UserList() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true); 
-  const [error, setError] = useState(null);   
 
   useEffect(() => {
     const fetchUsers = async () => { 
@@ -15,7 +15,7 @@ function UserList() {
         setUsers(response.data);
       } catch (error) {
         console.error(error);
-        setError(error); 
+        toast.error('Failed to fetch users');
       } finally {
         setLoading(false); 
       }
@@ -26,10 +26,6 @@ function UserList() {
 
   if (loading) {
     return <div>Loading users...</div>; 
-  }
-
-  if (error) {
-    return <div>Error: {error.message}</div>; 
   }
 
   return (

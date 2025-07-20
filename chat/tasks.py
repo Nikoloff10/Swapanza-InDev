@@ -3,6 +3,8 @@ from django.utils import timezone
 from .models import SwapanzaSession, Chat
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import logging
+logger = logging.getLogger(__name__)
 
 @shared_task
 def check_expired_swapanzas():
@@ -34,10 +36,10 @@ def check_expired_swapanzas():
                 affected_chats.add(session.chat.id)
             
             # Log for debugging
-            print(f"[Swapanza Expiry] Deactivated session for user {session.user.username} in chat {session.chat_id if session.chat else 'None'}")
+            logger.info(f"[Swapanza Expiry] Deactivated session for user {session.user.username} in chat {session.chat_id if session.chat else 'None'}")
             session_count += 1
         except Exception as e:
-            print(f"Error deactivating session: {str(e)}")
+            logger.error(f"Error deactivating session: {str(e)}")
     
     # Handle chat-specific Swapanza 
     expired_chats = Chat.objects.filter(
@@ -59,10 +61,10 @@ def check_expired_swapanzas():
             for user_id in chat.participants.values_list('id', flat=True):
                 affected_users.add(user_id)
             
-            print(f"[Swapanza Expiry] Deactivated Swapanza in chat {chat.id}")
+            logger.info(f"[Swapanza Expiry] Deactivated Swapanza in chat {chat.id}")
             chat_count += 1
         except Exception as e:
-            print(f"Error deactivating chat Swapanza: {str(e)}")
+            logger.error(f"Error deactivating chat Swapanza: {str(e)}")
     
     # Send notifications to all affected chats - this notifies users in the chat
     for chat_id in affected_chats:
@@ -73,9 +75,9 @@ def check_expired_swapanzas():
                     'type': 'swapanza_expire',
                 }
             )
-            print(f"[Swapanza Expiry] Sent expire notification to chat {chat_id}")
+            logger.info(f"[Swapanza Expiry] Sent expire notification to chat {chat_id}")
         except Exception as e:
-            print(f"Error sending expire notification to chat {chat_id}: {str(e)}")
+            logger.error(f"Error sending expire notification to chat {chat_id}: {str(e)}")
     
     # Send logout notifications to all affected users - CRITICAL: This must be sent to user's personal channels
     for user_id in affected_users:
@@ -101,9 +103,9 @@ def check_expired_swapanzas():
                     }
                 )
             
-            print(f"[Swapanza Expiry] Sent logout notification to user {user_id}")
+            logger.info(f"[Swapanza Expiry] Sent logout notification to user {user_id}")
         except Exception as e:
-            print(f"Error sending logout notification to user {user_id}: {str(e)}")
+            logger.error(f"Error sending logout notification to user {user_id}: {str(e)}")
     
     return f"Reset {session_count} expired Swapanza sessions and {chat_count} chat Swapanzas. Affected {len(affected_users)} users."
 

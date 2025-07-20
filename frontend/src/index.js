@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import axios from 'axios';
@@ -7,11 +7,15 @@ import axios from 'axios';
 import './utils/axiosConfig';
 import { validateToken } from './utils/tokenUtils';
 
-// Set default base URL for all axios requests
-// In production, you can leave it empty if your API is served from the same domain
-axios.defaults.baseURL = process.env.NODE_ENV === 'production' 
-  ? '' 
-  : 'http://localhost:8000';
+// Set the base URL for all axios requests.
+// In development, this points to the Django backend.
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+// Configure Axios to handle Django's CSRF protection.
+// This ensures that POST, PUT, DELETE requests include the CSRF token.
+axios.defaults.xsrfCookieName = 'csrftoken';
+axios.defaults.xsrfHeaderName = 'X-CSRFToken';
+axios.defaults.withCredentials = true;
 
 // Check if we're already on an auth page before validating token
 const isAuthPage = () => {
@@ -24,9 +28,10 @@ if (!isAuthPage()) {
   validateToken();
 }
 
-ReactDOM.render(
+const container = document.getElementById('root');
+const root = createRoot(container);
+root.render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
-  document.getElementById('root')
+  </React.StrictMode>
 );

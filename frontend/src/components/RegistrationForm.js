@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -10,12 +11,11 @@ function RegistrationForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setError({ confirmPassword: ["Passwords do NOT match"] });
+      toast.error("Passwords do NOT match");
       return;
     }
 
@@ -32,7 +32,7 @@ function RegistrationForm() {
       );
       navigate('/login');
     } catch (error) {
-      setError(error.response.data);
+      toast.error(error.response?.data?.detail || 'Registration failed');
     }
   };
 
@@ -42,13 +42,6 @@ function RegistrationForm() {
 
   return (
     <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-10 p-6 bg-white rounded shadow text-center">
-      {error && (
-        <ul className="text-red-500 mb-4">
-          {Object.values(error).map((err, index) => (
-            <li key={index}>{err[0]}</li>
-          ))}
-        </ul>
-      )}
       <input
         type="text"
         placeholder="Username"

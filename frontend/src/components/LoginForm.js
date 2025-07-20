@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 function LoginForm({ login }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const handleLoginRedirect = () => {
@@ -14,7 +14,6 @@ function LoginForm({ login }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
 
     try {
       const response = await axios.post('/api/token/', {
@@ -42,17 +41,17 @@ function LoginForm({ login }) {
       navigate('/chats', { replace: true });
 
     } catch (error) {
-      setError(error.response?.data?.detail || 'Login failed');
+      toast.error(error.response?.data?.detail || 'Login failed');
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-10 p-6 bg-white rounded shadow text-center">
-      {error && (
+      {/* Remove: {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
           {error}
         </div>
-      )}
+      )} */}
 
       <input
         type="text"

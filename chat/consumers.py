@@ -5,10 +5,17 @@ from django.utils import timezone
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from .models import Chat, Message, SwapanzaSession
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+User = get_user_model()
 from rest_framework_simplejwt.tokens import AccessToken
 from django.db.models import Q
 import asyncio
+import logging
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from django.contrib.auth.models import AnonymousUser
+import traceback
+logger = logging.getLogger(__name__)
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -21,8 +28,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         
         if not self.user or not self.user.is_authenticated:
-            print(
-                f"Rejecting WebSocket connection - User is not authenticated")
+            logger.warning("Rejecting WebSocket connection - User is not authenticated")
             await self.close(code=4001)
             return
 
@@ -87,16 +93,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         try:
             data = json.loads(text_data)
-            print(f"Received WebSocket message: {data}")
+            logger.info(f"Received WebSocket message: {data}")
             message_type = data.get('type', '')
 
             if message_type == 'chat.message':
                 content = data.get('content', '').strip()
+                client_id = data.get('client_id')
                 if not content:
                     return
 
                 
                 message_data = await self.save_chat_message(content)
+                if client_id:
+                    message_data['client_id'] = client_id
 
                 
                 if message_data.get('error'):
@@ -105,11 +114,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         text_data=json.dumps({
                             'type': 'chat.message.error',
                             'message': message_data['message'],
-                            'content': message_data['content']
+                            'content': message_data['content'],
+                            'client_id': client_id
                         }))
                     return
 
                 
+                # Send notification to all other participants with actual unread count
+                chat = await database_sync_to_async(Chat.objects.get)(id=self.chat_id)
+                participants = await database_sync_to_async(lambda: list(chat.participants.exclude(id=self.user.id)) )()
+                channel_layer = get_channel_layer()
+                for recipient in participants:
+                    # Calculate actual unread count for this recipient
+                    from .models import Message
+                    unread_count = await database_sync_to_async(lambda: Message.objects.filter(chat=chat).exclude(read_by=recipient).exclude(sender=recipient).count())()
+                    await channel_layer.group_send(
+                        f'user_{recipient.id}',
+                        {
+                            'type': 'notify',
+                            'data': {
+                                'type': 'unread_count',
+                                'chat_id': chat.id,
+                                'count': unread_count
+                            }
+                        }
+                    )
+
                 await self.channel_layer.group_send(self.chat_group_name, {
                     'type': 'chat_message',
                     'message': message_data
@@ -127,6 +157,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     return
 
                 
+                # Notify all other participants of the Swapanza invite
+                chat = await database_sync_to_async(Chat.objects.get)(id=self.chat_id)
+                participants = await database_sync_to_async(lambda: list(chat.participants.exclude(id=self.user.id)) )()
+                channel_layer = get_channel_layer()
+                for recipient in participants:
+                    await channel_layer.group_send(
+                        f'user_{recipient.id}',
+                        {
+                            'type': 'notify',
+                            'data': {
+                                'type': 'swapanza_invite',
+                                'chat_id': chat.id,
+                                'from': self.user.username
+                            }
+                        }
+                    )
+
                 await self.channel_layer.group_send(
                     self.chat_group_name, {
                         'type': 'swapanza_request',
@@ -188,9 +235,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'message': 'Invalid JSON'
             }))
         except Exception as e:
-            import traceback
-            print(f"Error processing message: {str(e)}")
-            print(traceback.format_exc())
+            logger.error(f"Error processing message: {str(e)}")
+            logger.error(traceback.format_exc())
             await self.send(
                 text_data=json.dumps({
                     'type': 'error',
@@ -401,7 +447,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             remaining_messages = max(0, 2 - current_count)
 
             
-            print(
+            logger.info(
                 f"Active Swapanza in chat {chat.id} - user {user_id_str} has {current_count} messages, {remaining_messages} remaining"
             )
 
@@ -457,7 +503,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     chat.swapanza_message_count = chat_message_counts
                     chat.save(update_fields=['swapanza_message_count'])
 
-                print(
+                logger.info(
                     f"Global Swapanza active - user {user.id} has {actual_message_count} messages in chat {self.chat_id}, SHOWING {remaining_messages} remaining"
                 )
 
@@ -499,7 +545,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     two_minutes_ago = timezone.now() - timezone.timedelta(
                         minutes=2)
                     if chat.swapanza_requested_at < two_minutes_ago:
-                        print(
+                        logger.info(
                             f"Clearing stale Swapanza request from {chat.swapanza_requested_by.username}"
                         )
                         chat.swapanza_requested_by = None
@@ -543,9 +589,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             return True, None
         except Exception as e:
-            print(f"Error creating Swapanza request: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
+            logger.error(f"Error creating Swapanza request: {str(e)}")
+            logger.error(traceback.format_exc())
             return False, str(e)
 
     
@@ -573,9 +618,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             return True, "Confirmation successful", all_confirmed
         except Exception as e:
-            print(f"Error confirming Swapanza: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
+            logger.error(f"Error confirming Swapanza: {str(e)}")
+            logger.error(traceback.format_exc())
             return False, str(e), False
 
     
@@ -659,9 +703,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     2  
                 }
         except Exception as e:
-            print(f"Error activating Swapanza: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
+            logger.error(f"Error activating Swapanza: {str(e)}")
+            logger.error(traceback.format_exc())
             return False, str(e), None
 
     async def chat_message(self, event):
@@ -681,7 +724,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if message.get('during_swapanza') and message.get('apparent_sender'):
             
             try:
-                from django.contrib.auth.models import User
                 apparent_sender_id = message.get('apparent_sender')
 
                 
@@ -703,7 +745,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     data_to_send[
                         'apparent_sender_profile_image'] = ""  
             except Exception as e:
-                print(f"Error getting apparent sender info: {str(e)}")
+                logger.error(f"Error getting apparent sender info: {str(e)}")
 
         await self.send(text_data=json.dumps(data_to_send))
 
@@ -782,26 +824,39 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def deactivate_swapanza_sessions(self):
-        """Deactivate all Swapanza sessions for this chat"""
+        """Deactivate all Swapanza sessions for this chat and clear pending invites if stale and not fully confirmed"""
         try:
+            from django.utils import timezone
             chat = Chat.objects.get(id=self.chat_id)
 
-            
+            # Deactivate all sessions
             participants = list(chat.participants.all())
-
-            
             SwapanzaSession.objects.filter(user__in=participants,
                                            chat=chat,
                                            active=True).update(active=False)
 
-            
+            # Reset Swapanza state
             chat.swapanza_active = False
-            chat.save(update_fields=['swapanza_active'])
+            update_fields = ['swapanza_active']
 
-            print(f"Deactivated Swapanza sessions for chat {self.chat_id}")
+            # Only clear pending invites if the request is stale (older than 2 minutes) and not all confirmed
+            if chat.swapanza_requested_at:
+                stale_threshold = timezone.now() - timezone.timedelta(minutes=2)
+                all_confirmed = False
+                if chat.swapanza_confirmed_users and len(chat.swapanza_confirmed_users) == chat.participants.count():
+                    all_confirmed = True
+                if chat.swapanza_requested_at < stale_threshold and not all_confirmed:
+                    chat.swapanza_requested_by = None
+                    chat.swapanza_confirmed_users = []
+                    chat.swapanza_requested_at = None
+                    update_fields += ['swapanza_requested_by', 'swapanza_confirmed_users', 'swapanza_requested_at']
+
+            chat.save(update_fields=update_fields)
+
+            logger.info(f"Deactivated Swapanza sessions for chat {self.chat_id} (cleared pending invite if stale and not all confirmed)")
             return True
         except Exception as e:
-            print(f"Error deactivating Swapanza sessions: {str(e)}")
+            logger.error(f"Error deactivating Swapanza sessions: {str(e)}")
             return False
 
     @database_sync_to_async
@@ -820,12 +875,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 message.read_by.add(self.user)
                 updated_count += 1
 
-            print(
+            logger.info(
                 f"Marked {updated_count} messages as read in chat {self.chat_id}"
             )
             return updated_count
         except Exception as e:
-            print(f"Error marking messages as read: {str(e)}")
+            logger.error(f"Error marking messages as read: {str(e)}")
             return 0
 
     @database_sync_to_async
@@ -838,7 +893,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 active=True,
                 ends_at__gt=timezone.now()).first()
         except Exception as e:
-            print(f"Error getting active Swapanza session: {str(e)}")
+            logger.error(f"Error getting active Swapanza session: {str(e)}")
             return None
 
     @database_sync_to_async
@@ -921,8 +976,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             return True, None
         except Exception as e:
-            print(f"Error creating Swapanza sessions: {str(e)}")
-            print(traceback.format_exc())  
+            logger.error(f"Error creating Swapanza sessions: {str(e)}")
+            logger.error(traceback.format_exc())  
             return False, str(e)
 
     @database_sync_to_async
@@ -983,7 +1038,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if chat.swapanza_requested_by and not chat.swapanza_active:
                 
                 if chat.swapanza_requested_by.id == self.user.id:
-                    print(
+                    logger.info(
                         f"Clearing pending Swapanza request from {self.user.username} in chat {self.chat_id}"
                     )
                     chat.swapanza_requested_by = None
@@ -995,5 +1050,60 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             return False
         except Exception as e:
-            print(f"Error clearing pending Swapanza request: {str(e)}")
+            logger.error(f"Error clearing pending Swapanza request: {str(e)}")
             return False
+
+
+class NotificationConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        import logging
+        logger = logging.getLogger(__name__)
+        self.user = await self.get_user_from_token()
+        if not self.user or not self.user.is_authenticated:
+            logger.warning(f"NotificationConsumer: user not authenticated, closing. user={self.user}")
+            await self.close()
+            return
+        logger.info(f"NotificationConsumer: user {self.user} authenticated, accepting connection.")
+        self.group_name = f'user_{self.user.id}'
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, code):
+        logger = logging.getLogger(__name__)
+        try:
+            logger.info(f"NotificationConsumer: disconnect called for user={getattr(self, 'user', None)} with code={code}")
+            if hasattr(self, 'group_name'):
+                await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        except Exception as e:
+            logger.error(f"Error during disconnect: {e}\n{traceback.format_exc()}")
+
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            if data.get("type") == "ping":
+                logger.info("NotificationConsumer: received ping, sending pong")
+                await self.send(text_data=json.dumps({"type": "pong"}))
+                logger.info("NotificationConsumer: sent pong")
+                return
+            # Handle ping/pong for keepalive
+            if data.get('type') == 'ping':
+                await self.send(text_data=json.dumps({'type': 'pong'}))
+        except Exception as e:
+            logger.error(f"Exception in NotificationConsumer.receive: {e}\n{traceback.format_exc()}")
+            pass
+
+    async def notify(self, event):
+        await self.send(text_data=json.dumps(event['data']))
+
+    @database_sync_to_async
+    def get_user_from_token(self):
+        from urllib.parse import parse_qs
+        query_string = self.scope.get('query_string', b'').decode()
+        token = parse_qs(query_string).get('token', [None])[0]
+        if not token:
+            return AnonymousUser()
+        try:
+            access_token = AccessToken(token)
+            return User.objects.get(id=access_token['user_id'])
+        except Exception:
+            return AnonymousUser()

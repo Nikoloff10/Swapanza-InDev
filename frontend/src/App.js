@@ -7,7 +7,8 @@ import Profile from './components/Profile';
 import Home from './components/Home';
 import { setupTokenExpirationChecker, validateToken } from './utils/tokenUtils';
 import './utils/axiosConfig';
-
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
 function ScrollToTop() {
@@ -60,33 +61,36 @@ function App() {
   }
 
   return (
-    <Router>
-      <ScrollToTop />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route
-          path="/login"
-          element={isAuth ? <Navigate to="/chats" replace /> : <LoginForm login={login} />}
-        />
-        <Route
-          path="/register"
-          element={isAuth ? <Navigate to="/chats" replace /> : <RegistrationForm />}
-        />
-        <Route
-          path="/chats"
-          element={isAuth ? <ChatList logout={logout} username={username} /> : <Navigate to="/login" replace />}
-        />
-       <Route 
-          path="/profile" 
-          element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />} 
-        />
-        <Route 
-          path="/profile/:userId" 
-          element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />} 
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+    <>
+      <ToastContainer position="top-right" autoClose={4000} hideProgressBar={false} newestOnTop closeOnClick pauseOnFocusLoss draggable pauseOnHover />
+      <Router>
+        <ScrollToTop />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route
+            path="/login"
+            element={isAuth ? <Navigate to="/chats" replace /> : <LoginForm login={login} />}
+          />
+          <Route
+            path="/register"
+            element={isAuth ? <Navigate to="/chats" replace /> : <RegistrationForm />}
+          />
+          <Route
+            path="/chats"
+            element={isAuth ? <ChatList logout={logout} username={username} /> : <Navigate to="/login" replace />}
+          />
+         <Route 
+            path="/profile" 
+            element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />} 
+          />
+          <Route 
+            path="/profile/:userId" 
+            element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />} 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </>
   );
 }
 

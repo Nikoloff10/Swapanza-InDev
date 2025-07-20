@@ -32,15 +32,23 @@ load_dotenv(dotenv_path=dotenv_path)
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Explicitly check if the environment variable is set to 'True', default to False
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True' 
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'  # Set to False in production!
 
-# Must be set in .env, split by comma. Default to empty list if not set.
+# Allowed hosts should be set via environment variable, comma-separated
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 
-ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host] 
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'  # False in prod
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+CORS_ALLOWED_ORIGINS = [o for o in CORS_ALLOWED_ORIGINS if o]
 
-
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:3000,http://localhost:8000'
+).split(',')
+CSRF_TRUSTED_ORIGINS = [o for o in CSRF_TRUSTED_ORIGINS if o and (o.startswith('http://') or o.startswith('https://'))]
 
 
 INSTALLED_APPS = [
@@ -106,17 +114,7 @@ DATABASES = {
 
 
 
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True' 
-CORS_ALLOW_CREDENTIALS = True 
-
-CSRF_TRUSTED_ORIGINS = os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',')
-
-CSRF_TRUSTED_ORIGINS = [origin for origin in CSRF_TRUSTED_ORIGINS if origin]
-
-
-if not CORS_ALLOW_ALL_ORIGINS:
-    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
-    CORS_ALLOWED_ORIGINS = [origin for origin in CORS_ALLOWED_ORIGINS if origin]
+CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', 'False') == 'True'
 
 
 REST_FRAMEWORK = {

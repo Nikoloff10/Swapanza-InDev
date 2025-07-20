@@ -49,7 +49,7 @@ function SwapanzaModal({
         
         <p className="text-center mb-6">
           {requestedBy === 'you' ? (
-            <>You've sent a Swapanza invitation for <span className="font-semibold">{duration} minutes</span>. Please confirm to participate.</>
+            <>You&apos;ve sent a Swapanza invitation for <span className="font-semibold">{duration} minutes</span>. Please confirm to participate.</>
           ) : (
             <>
               <span className="font-semibold">{requestedByUsername}</span> has invited you to swap profiles for <span className="font-semibold">{duration} minutes</span>!

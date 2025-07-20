@@ -16,12 +16,13 @@ from rest_framework.decorators import api_view, permission_classes, parser_class
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404, render
 from rest_framework import filters, pagination
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
+logger = logging.getLogger(__name__)
 
 
-@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
@@ -40,6 +41,17 @@ def upload_profile_image(request, user_id):
 
     user = request.user
     image = request.FILES['profile_image']
+
+    # --- File type and size validation ---
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    max_size = 5 * 1024 * 1024  # 5MB
+    if image.content_type not in allowed_types:
+        return Response({"detail": "Invalid file type. Only JPEG, PNG, GIF, and WEBP are allowed."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if image.size > max_size:
+        return Response({"detail": "File too large. Maximum size is 5MB."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    # --- End validation ---
 
     try:
         
@@ -207,7 +219,7 @@ def unread_message_counts(request):
         if count > 0:
             unread_counts[str(chat.id)] = count
 
-    print(f"Unread counts for user {user.username}: {unread_counts}")
+    logger.info(f"Unread counts for user {user.username}: {unread_counts}")
     return Response(unread_counts)
 
 

@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.tokens import AccessToken, TokenError
 from urllib.parse import parse_qs
+import logging
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -14,10 +16,10 @@ def get_user(token_key):
         user = User.objects.get(id=access_token['user_id'])
         return user
     except (TokenError, User.DoesNotExist, KeyError) as e:
-        print(f"Token authentication error: {str(e)}")
+        logger.warning(f"Token authentication error: {str(e)}")
         return AnonymousUser()
     except Exception as e:
-        print(f"Unexpected error during token auth: {str(e)}")
+        logger.error(f"Unexpected error during token auth: {str(e)}")
         return AnonymousUser()
 
 class TokenAuthMiddleware(BaseMiddleware):
@@ -32,7 +34,7 @@ class TokenAuthMiddleware(BaseMiddleware):
             else:
                 scope['user'] = AnonymousUser()
         except Exception as e:
-            print(f"Error in TokenAuthMiddleware: {str(e)}")
+            logger.error(f"Error in TokenAuthMiddleware: {str(e)}")
             scope['user'] = AnonymousUser()
         
         return await super().__call__(scope, receive, send)

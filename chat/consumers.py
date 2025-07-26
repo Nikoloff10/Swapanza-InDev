@@ -15,6 +15,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
 import traceback
+from asgiref.sync import sync_to_async
 logger = logging.getLogger(__name__)
 
 
@@ -727,7 +728,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 apparent_sender_id = message.get('apparent_sender')
 
                 
-                apparent_sender = User.objects.get(id=apparent_sender_id)
+                apparent_sender = await sync_to_async(User.objects.get)(id=apparent_sender_id)
                 data_to_send[
                     'apparent_sender_username'] = apparent_sender.username
 

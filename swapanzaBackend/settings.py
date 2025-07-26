@@ -38,6 +38,12 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'  # Set to False in pro
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
 ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 
+if DEBUG:
+    ALLOWED_HOSTS.extend([
+        'localhost',
+        '127.0.0.1',
+    ])
+
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'  # False in prod
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')

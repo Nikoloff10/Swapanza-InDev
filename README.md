@@ -69,7 +69,7 @@ CORS_ALLOW_ALL_ORIGINS=False
 CORS_ALLOWED_ORIGINS=http://localhost:3000
 CSRF_TRUSTED_ORIGINS=http://localhost:3000
 SECRET_KEY=your-secret-key
-DATABASE_URL=sqlite:///db.sqlite3
+DATABASE_URL=your-database-url
 ```
 - **Never set DEBUG=True in production!**
 - Set your production domain(s) in `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, and `CSRF_TRUSTED_ORIGINS`.

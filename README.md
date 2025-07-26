@@ -7,13 +7,62 @@ Swapanza is a real-time chat application with a unique twist: users can temporar
 
 ## Setup & Installation
 
-### 1. Clone the Repository
+### Option 1: Docker (Recommended)
+
+The easiest way to run Swapanza is using Docker Compose, which sets up all services automatically:
+
+```sh
+# Clone the repository
+git clone <repo-url>
+cd Swapanza
+
+# Build and start all services
+docker-compose up --build
+
+# Or run in background
+docker-compose up -d --build
+```
+
+This will start:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
+- **Celery Worker**: Background task processing
+
+#### Docker Commands:
+```sh
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (database data)
+docker-compose down -v
+
+# Rebuild specific service
+docker-compose build backend
+
+# Access backend shell
+docker-compose exec backend python manage.py shell
+
+# Run migrations
+docker-compose exec backend python manage.py migrate
+
+# Create superuser
+docker-compose exec backend python manage.py createsuperuser
+```
+
+### Option 2: Local Development
+
+#### 1. Clone the Repository
 ```sh
 git clone <repo-url>
 cd Swapanza
 ```
 
-### 2. Python Backend Setup
+#### 2. Python Backend Setup
 - Create and activate a virtual environment:
   ```sh
   python -m venv .venv
@@ -33,7 +82,7 @@ cd Swapanza
   python manage.py runserver
   ```
 
-### 3. Frontend Setup
+#### 3. Frontend Setup
 - Go to the frontend directory:
   ```sh
   cd frontend
@@ -47,7 +96,7 @@ cd Swapanza
   npm start
   ```
 
-### 4. Redis & Celery (for real-time and background tasks)
+#### 4. Redis & Celery (for real-time and background tasks)
 - Start Redis server (see Redis docs for your OS).
 - Start Celery worker:
   ```sh

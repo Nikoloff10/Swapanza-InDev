@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../utils/axiosConfig';
 import { toast } from 'react-toastify';
-
-const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 function RegistrationForm() {
   const navigate = useNavigate();
@@ -20,19 +18,26 @@ function RegistrationForm() {
     }
 
     try {
-      await axios.post(
-        `${apiUrl}/api/users/create/`,
-        {
-          username: username,
-          password: password.trim(),
-          email: email,
-          confirm_password: confirmPassword.trim()
-        },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+      await axios.post('/api/users/create/', {
+        username: username,
+        password: password.trim(),
+        email: email
+      });
+      toast.success('Registration successful! Please login.');
       navigate('/login');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      if (error.response?.data) {
+        // Handle validation errors
+        const errors = error.response.data;
+        if (typeof errors === 'object') {
+          const errorMessages = Object.values(errors).flat();
+          errorMessages.forEach(msg => toast.error(msg));
+        } else {
+          toast.error(error.response.data.detail || 'Registration failed');
+        }
+      } else {
+        toast.error('Registration failed');
+      }
     }
   };
 

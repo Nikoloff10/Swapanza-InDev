@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
+import axios from "../utils/axiosConfig";
 import ChatModal from "./ChatModal";
 import { useNavigate } from "react-router-dom";
-import { FaBell, FaUser } from "react-icons/fa";
+import { FaBell, FaUser, FaSearch, FaTimes, FaPlus } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
 function ChatList({ logout, username }) {
@@ -275,8 +275,6 @@ function ChatList({ logout, username }) {
     };
   }, [wsConnected, fetchChats, fetchUnreadCounts]);
 
-  // Function to open chat modal
-
   // Handle when messages are read
   const handleMessagesRead = useCallback(() => {
     console.log("Messages read callback triggered");
@@ -445,193 +443,254 @@ function ChatList({ logout, username }) {
   }, [token, currentUserId, openModal]);
 
   return (
-    <div className="max-w-md mx-auto p-4 bg-white rounded shadow">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center">
-          {/* Profile Picture (circular) */}
-          <div
-            className="h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 cursor-pointer overflow-hidden"
-            onClick={handleProfileClick}
-          >
-            {currentUserProfile?.profile_image_url ? (
-              <img
-                src={currentUserProfile.profile_image_url}
-                alt={username}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="text-lg font-bold">
-                {username ? username[0].toUpperCase() : "?"}
-              </span>
-            )}
-          </div>
-          <h1 className="text-2xl font-bold">Chats</h1>
-        </div>
-
-        <div className="flex items-center">
-          {/* Profile button */}
-          <button
-            onClick={handleProfileClick}
-            className="mr-3 p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
-            title="View Profile"
-          >
-            <FaUser className="text-blue-600" />
-          </button>
-
-          {/* Notifications */}
-          <div className="relative mr-4">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 bg-blue-100 rounded-full hover:bg-blue-200 focus:outline-none"
-            >
-              <FaBell className="text-blue-600" />
-              {totalUnreadMessages > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {totalUnreadMessages}
-                </span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-10 border border-gray-200">
-                <div className="p-3 border-b border-gray-200 font-medium flex justify-between items-center">
-                  <span>Notifications</span>
-                  <button
-                    onClick={resetAllNotifications}
-                    className="text-xs text-blue-500 hover:text-blue-700"
-                  >
-                    Reset All
-                  </button>
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  {Object.keys(unreadCounts).length > 0 ? (
-                    Object.entries(unreadCounts).map(([chatId, count]) => {
-                      // Find chat info to display name
-                      const chat = chats.find(
-                        (c) => c.id.toString() === chatId
-                      );
-                      
-                      // For hidden chats with Swapanza invites, we need to fetch from server or look at the full response
-                      let otherUser = chat?.participants?.find(
-                        (p) => Number(p.id) !== Number(currentUserId)
-                      );
-
-                      // Special handling for Swapanza invites (count === -1)
-                      const isSwapanzaInvite = count === -1;
-
-                      return (
-                        <div
-                          key={chatId}
-                          className="p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => {
-                            openModal(Number(chatId));
-                            setShowNotifications(false);
-                          }}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">
-                              {otherUser?.username || "Unknown"}
-                            </span>
-                            <span className={`${isSwapanzaInvite ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'} text-xs font-medium px-2 py-0.5 rounded`}>
-                              {isSwapanzaInvite ? 'Swapanza Invite' : `${count} ${count === 1 ? "message" : "messages"}`}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100">
+      <div className="container py-8">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="card mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                {/* Profile Picture */}
+                <div
+                  className="h-12 w-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 text-white flex items-center justify-center cursor-pointer overflow-hidden ring-2 ring-white shadow-lg"
+                  onClick={handleProfileClick}
+                >
+                  {currentUserProfile?.profile_image_url ? (
+                    <img
+                      src={currentUserProfile.profile_image_url}
+                      alt={username}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
-                    <div className="p-4 text-gray-500 text-center">
-                      No new messages
+                    <span className="text-xl font-bold">
+                      {username ? username[0].toUpperCase() : "?"}
+                    </span>
+                  )}
+                </div>
+                
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">💬 Chats</h1>
+                  <p className="text-gray-600 text-sm">Welcome back, {username}!</p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                {/* Profile Button */}
+                <button
+                  onClick={handleProfileClick}
+                  className="p-3 bg-green-100 hover:bg-green-200 rounded-full transition-colors duration-200"
+                  title="View Profile"
+                >
+                  <FaUser className="text-green-600 w-4 h-4" />
+                </button>
+
+                {/* Notifications */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="p-3 bg-green-100 hover:bg-green-200 rounded-full transition-colors duration-200 relative"
+                  >
+                    <FaBell className="text-green-600 w-4 h-4" />
+                    {totalUnreadMessages > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                        {totalUnreadMessages}
+                      </span>
+                    )}
+                  </button>
+
+                  {showNotifications && (
+                    <div className="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-2xl z-20 border border-gray-100">
+                      <div className="p-4 border-b border-gray-100 font-semibold flex justify-between items-center">
+                        <span className="text-gray-900">Notifications</span>
+                        <button
+                          onClick={resetAllNotifications}
+                          className="text-sm text-green-600 hover:text-green-700 font-medium"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto">
+                        {Object.keys(unreadCounts).length > 0 ? (
+                          Object.entries(unreadCounts).map(([chatId, count]) => {
+                            const chat = chats.find(
+                              (c) => c.id.toString() === chatId
+                            );
+                            
+                            let otherUser = chat?.participants?.find(
+                              (p) => Number(p.id) !== Number(currentUserId)
+                            );
+
+                            const isSwapanzaInvite = count === -1;
+
+                            return (
+                              <div
+                                key={chatId}
+                                className="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                                onClick={() => {
+                                  openModal(Number(chatId));
+                                  setShowNotifications(false);
+                                }}
+                              >
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-sm font-bold">
+                                      {otherUser?.username?.[0]?.toUpperCase() || "?"}
+                                    </div>
+                                    <span className="font-medium text-gray-900">
+                                      {otherUser?.username || "Unknown"}
+                                    </span>
+                                  </div>
+                                  <span className={`${
+                                    isSwapanzaInvite 
+                                      ? 'bg-purple-100 text-purple-800' 
+                                      : 'bg-green-100 text-green-800'
+                                  } text-xs font-medium px-3 py-1 rounded-full`}>
+                                    {isSwapanzaInvite ? '🎭 Swapanza' : `${count} new`}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="p-8 text-center text-gray-500">
+                            <div className="text-4xl mb-2">✨</div>
+                            <p>All caught up!</p>
+                            <p className="text-sm">No new messages</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
+
+                {/* Logout Button */}
+                <button
+                  onClick={logout}
+                  className="btn-danger"
+                >
+                  🚪 Logout
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Section */}
+          <div className="card mb-6">
+            <div className="relative">
+              <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search users to start chatting..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input-field pl-12"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <FaTimes className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {searchResults.map((user) => (
+                  <div
+                    key={user.id}
+                    onClick={() => createChat(user.id)}
+                    className="flex items-center justify-between p-3 bg-gray-50 hover:bg-green-50 rounded-lg cursor-pointer transition-colors duration-200 border border-gray-100"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-sm font-bold">
+                        {user.username[0].toUpperCase()}
+                      </div>
+                      <span className="font-medium text-gray-900">{user.username}</span>
+                    </div>
+                    <FaPlus className="text-green-500 w-4 h-4" />
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Logout button */}
-          <button
-            onClick={logout}
-            className="px-3 py-1 bg-red-500 text-white rounded"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full p-2 border rounded"
-        />
-        {searchResults.length > 0 && (
-          <div className="mt-2 border border-gray-200 rounded shadow">
-            {searchResults.map((user) => (
-              <div
-                key={user.id}
-                onClick={() => createChat(user.id)}
-                className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-              >
-                {user.username}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="mb-4">
-        <button
-          onClick={closeAllChats}
-          className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-        >
-          Close All Chats
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        {chats.map((chat) => {
-          // Find the other participant (assuming 2-person chats)
-          const otherUser = chat.participants.find(
-            (p) => Number(p.id) !== Number(currentUserId)
-          );
-          const chatName = otherUser ? otherUser.username : "Unknown User";
-          const unreadCount = unreadCounts[chat.id] || 0;
-
-          return (
-            <div
-              key={chat.id}
-              onClick={() => openModal(chat.id)}
-              className="p-4 border rounded cursor-pointer hover:bg-gray-100 flex justify-between items-center"
-            >
-              <div className="flex items-center">
-                <span>{chatName}</span>
-                {unreadCount > 0 && (
-                  <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
+          {/* Actions */}
+          {chats.length > 0 && (
+            <div className="mb-6">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeChat(chat.id);
-                }}
-                className="ml-2 px-2 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm"
+                onClick={closeAllChats}
+                className="w-full btn-secondary"
               >
-                Close
+                Close All Chats
               </button>
             </div>
-          );
-        })}
+          )}
+
+          {/* Chat List */}
+          <div className="space-y-3">
+            {chats.length > 0 ? (
+              chats.map((chat) => {
+                const otherUser = chat.participants.find(
+                  (p) => Number(p.id) !== Number(currentUserId)
+                );
+                const chatName = otherUser ? otherUser.username : "Unknown User";
+                const unreadCount = unreadCounts[chat.id] || 0;
+
+                return (
+                  <div
+                    key={chat.id}
+                    onClick={() => openModal(chat.id)}
+                    className="card cursor-pointer hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-300 to-red-500 flex items-center justify-center text-white text-lg font-bold">
+                          {chatName[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{chatName}</h3>
+                          <p className="text-sm text-gray-500">Click to open chat</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        {unreadCount > 0 && (
+                          <span className="bg-red-500 text-white text-sm rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                            {unreadCount}
+                          </span>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeChat(chat.id);
+                          }}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors duration-200"
+                          title="Close chat"
+                        >
+                          <FaTimes className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="card text-center py-12">
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No chats yet</h3>
+                <p className="text-gray-600 mb-4">Search for users above to start your first conversation!</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {isModalOpen && modalChatId && (
         <ChatModal
           chatId={modalChatId}
-          hasPendingSwapanzaInvite={unreadCounts[modalChatId] === -1}
+          hasPendingSwapanzaInvite={false}
           onClose={() => {
             setIsModalOpen(false);
             // Fetch chats and unread counts when closing the modal

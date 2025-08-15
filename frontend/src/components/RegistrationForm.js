@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from '../utils/axiosConfig';
 import { toast } from 'react-toastify';
 
@@ -9,14 +9,16 @@ function RegistrationForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      toast.error("Passwords do NOT match");
+      toast.error("Passwords do not match");
       return;
     }
 
+    setIsLoading(true);
     try {
       await axios.post('/api/users/create/', {
         username: username,
@@ -38,57 +40,135 @@ function RegistrationForm() {
       } else {
         toast.error('Registration failed');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleLoginRedirect = () => {
-    navigate('/login');
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-10 p-6 bg-white rounded shadow text-center">
-      <input
-        type="text"
-        placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        required
-        className="w-full p-3 mb-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-      />
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        className="w-full p-3 mb-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-        className="w-full p-3 mb-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-      />
-      <input
-        type="password"
-        placeholder="Confirm Password"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        required
-        className="w-full p-3 mb-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-      />
-      <button type="submit" className="w-full bg-green-500 text-white py-3 rounded hover:bg-green-600 transition-colors">
-        Register
-      </button>
-      <p className="mt-4">
-        or&nbsp;
-        <button type="button" onClick={handleLoginRedirect} className="text-blue-500 hover:underline">
-          Login
-        </button>
-      </p>
-    </form>
+    <div className="min-h-screen flex-center bg-gradient-to-br from-green-50 to-green-100 py-12">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-4">🚀</div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Join Swapanza</h1>
+          <p className="text-gray-600">Create your account and start chatting</p>
+        </div>
+
+        {/* Registration Form */}
+        <div className="card">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                placeholder="Choose a username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                required
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                placeholder="Create a strong password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="input-field"
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="btn-primary w-full flex items-center justify-center"
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Creating Account...
+                </>
+              ) : (
+                'Create Account'
+              )}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Already have an account?</span>
+            </div>
+          </div>
+
+          {/* Login Link */}
+          <div className="text-center">
+            <Link 
+              to="/login" 
+              className="btn-secondary w-full inline-block text-center"
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+
+        {/* Footer Links */}
+        <div className="text-center mt-6">
+          <div className="flex justify-center space-x-4 text-sm text-gray-500">
+            <Link to="/" className="hover:text-green-600 transition-colors">
+              Back to Home
+            </Link>
+            <span>•</span>
+            <span className="text-green-600">Terms of Service</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

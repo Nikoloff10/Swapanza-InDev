@@ -33,7 +33,9 @@ services:
 
   # Django Backend
   backend:
-    image: nikoloff10/swapanza-indev:latest
+    build:
+      context: .
+      dockerfile: swapanzaBackend/Dockerfile
     environment:
       - DJANGO_SETTINGS_MODULE=swapanzaBackend.settings
       - DJANGO_SECRET_KEY=django-insecure-sh%pzqu4(zfuax&i(uglk&nhd5d#&4msx!+&l=_s$!%73*_s(l
@@ -64,7 +66,7 @@ services:
 
   # React Frontend
   frontend:
-    image: nikoloff10/swapanza-indev-frontend:latest
+    build: ./frontend
     ports:
       - "3000:80"
     depends_on:
@@ -74,7 +76,9 @@ services:
 
   # Celery Worker (optional - for background tasks)
   celery:
-    image: nikoloff10/swapanza-indev:latest
+    build:
+      context: .
+      dockerfile: swapanzaBackend/Dockerfile
     environment:
       - DJANGO_SETTINGS_MODULE=swapanzaBackend.settings
       - DJANGO_SECRET_KEY=django-insecure-sh%pzqu4(zfuax&i(uglk&nhd5d#&4msx!+&l=_s$!%73*_s(l

@@ -6,7 +6,7 @@ import React, {
   memo,
   useMemo,
 } from "react";
-import axios from "axios";
+import axios from "../utils/axiosConfig";
 import SwapanzaModal from "./SwapanzaModal";
 import { redirectToLogin } from '../utils/tokenUtils';
 import { v4 as uuidv4 } from 'uuid';
@@ -1109,7 +1109,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   };
 
   // Render a message component with memoization
-  // Update the MemoizedMessage component to use swapanzaPartner
   const MemoizedMessage = memo(function MemoizedMessage({ msg, isCurrentUser, chat }) {
     
     console.log("Message data:", {
@@ -1124,10 +1123,10 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     const isDuringSwapanza = msg.during_swapanza === true;
     const isPending = msg.pending === true;
   
-    // Message style unchanged
+    // Modern message styling
     let messageStyle = isCurrentUser
-      ? `${isDuringSwapanza ? "bg-purple-500" : "bg-blue-500"} text-white rounded-l-lg rounded-tr-lg px-4 py-2 max-w-xs break-words`
-      : `${isDuringSwapanza ? "bg-purple-200" : "bg-gray-200"} text-gray-900 rounded-r-lg rounded-tl-lg px-4 py-2 max-w-xs break-words`;
+      ? `${isDuringSwapanza ? "bg-gradient-to-r from-purple-500 to-purple-600" : "bg-gradient-to-r from-green-500 to-green-600"} text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-xs break-words shadow-md`
+      : `${isDuringSwapanza ? "bg-gradient-to-r from-purple-100 to-purple-200" : "bg-white"} text-gray-900 rounded-2xl rounded-tl-md px-4 py-3 max-w-xs break-words shadow-sm border border-gray-100`;
   
     if (isPending) {
       messageStyle += " opacity-70";
@@ -1136,7 +1135,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     // Determine which username to display
     let displayUsername, profileImage;
   
-   
     if (isDuringSwapanza) {
       if (isCurrentUser && swapanzaPartner) {
         // Current user's messages - show as partner
@@ -1144,7 +1142,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         profileImage = swapanzaPartner.profile_image || null;
       } 
       else if (msg.apparent_sender_username) {
-        
         displayUsername = msg.apparent_sender_username;
         profileImage = msg.apparent_sender_profile_image || null;
       }
@@ -1162,9 +1159,9 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     }
   
     return (
-      <div className="flex items-end">
+      <div className="flex items-end space-x-3">
         {!isCurrentUser && (
-          <div className="h-6 w-6 rounded-full bg-gray-300 mr-2 flex-shrink-0 overflow-hidden">
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-md">
             {profileImage ? (
               <img
                 src={profileImage}
@@ -1173,7 +1170,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
               />
             ) : (
               <div className="h-full w-full flex items-center justify-center">
-                <span className="text-xs">
+                <span className="text-sm font-bold text-white">
                   {displayUsername?.[0]?.toUpperCase() || '?'}
                 </span>
               </div>
@@ -1182,17 +1179,17 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         )}
   
         <div className={messageStyle}>
-          <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
-          <div className="text-xs mt-1 opacity-75 flex justify-between">
-            <span>{isCurrentUser ? "You" : displayUsername}</span>
-            <span>
+          <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+          <div className="text-xs mt-2 opacity-75 flex justify-between items-center">
+            <span className="font-medium">{isCurrentUser ? "You" : displayUsername}</span>
+            <div className="flex items-center space-x-2">
               {isPending && (
-                <span className="ml-2 text-xs italic">Sending...</span>
+                <span className="text-xs italic text-yellow-600">⏳ Sending...</span>
               )}
               {isDuringSwapanza && (
-                <span className="ml-2 text-xs font-bold">Swapanza</span>
+                <span className="text-xs font-bold bg-purple-200 text-purple-800 px-2 py-1 rounded-full">🎭</span>
               )}
-            </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1220,28 +1217,32 @@ MemoizedMessage.displayName = "MemoizedMessage";
       );
 
       return (
-        <div className="border-t p-2 bg-purple-100">
-          <div className="text-center text-sm font-semibold text-purple-800">
-            <div>
-              <span className="font-bold">Swapanza Active!</span>
-              {timeLeft !== null && (
-                <span className="ml-2">
-                  Time Left: {Math.floor(timeLeft / 60)}:
-                  {(timeLeft % 60).toString().padStart(2, "0")}
-                </span>
-              )}
+        <div className="border-t p-4 bg-gradient-to-r from-purple-50 to-purple-100">
+          <div className="text-center">
+            <div className="flex items-center justify-center space-x-2 mb-2">
+              <span className="text-2xl">🎭</span>
+              <span className="text-lg font-bold text-purple-800">Swapanza Active!</span>
             </div>
+            
+            {timeLeft !== null && (
+              <div className="text-sm text-purple-700 mb-2">
+                ⏰ Time Left: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}
+              </div>
+            )}
+            
             {swapanzaStartTime && (
-              <div className="text-xs">
+              <div className="text-xs text-purple-600 mb-3">
                 Started: {new Date(swapanzaStartTime).toLocaleTimeString()}
               </div>
             )}
-            <div className="text-xs mt-1">
-              You appear as: {swapanzaPartner?.username}
-              <span className="mx-2">•</span>
-              <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded">
+            
+            <div className="flex items-center justify-center space-x-4 text-sm">
+              <div className="bg-white px-3 py-1 rounded-full border border-purple-200">
+                <span className="text-purple-800">You appear as: <strong>{swapanzaPartner?.username}</strong></span>
+              </div>
+              <div className="bg-purple-200 text-purple-800 px-3 py-1 rounded-full font-medium">
                 Messages left: {finalRemainingMessages}
-              </span>
+              </div>
             </div>
           </div>
         </div>
@@ -1251,33 +1252,42 @@ MemoizedMessage.displayName = "MemoizedMessage";
       const isCurrentUserRequester = Number(swapanzaRequestedBy) === Number(currentUserId);
 
       return (
-        <div className="border-t p-2 bg-yellow-100">
-          <div className="text-center text-sm">
-            {isCurrentUserRequester ? (
-              <span>You requested a Swapanza</span>
-            ) : (
-              <span>
-                <b>{swapanzaRequestedByUsername}</b> invited you to Swapanza
+        <div className="border-t p-4 bg-gradient-to-r from-yellow-50 to-yellow-100">
+          <div className="text-center">
+            <div className="flex items-center justify-center space-x-2 mb-3">
+              <span className="text-2xl">🎭</span>
+              <span className="text-lg font-bold text-yellow-800">
+                {isCurrentUserRequester ? "Swapanza Request Sent" : "Swapanza Invitation"}
               </span>
-            )}
+            </div>
+            
+            <div className="text-sm text-yellow-700 mb-3">
+              {isCurrentUserRequester ? (
+                "Waiting for partner to confirm..."
+              ) : (
+                <span>
+                  <strong>{swapanzaRequestedByUsername}</strong> invited you to Swapanza!
+                </span>
+              )}
+            </div>
 
-            {!userConfirmedSwapanza && (
+            {!userConfirmedSwapanza && !isCurrentUserRequester && (
               <button
                 onClick={confirmSwapanza}
-                className="ml-2 px-3 py-1 bg-purple-500 text-white text-xs rounded hover:bg-purple-600"
+                className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-md"
               >
-                Confirm
+                Confirm Participation
               </button>
             )}
 
             {userConfirmedSwapanza && partnerConfirmedSwapanza ? (
-              <span className="block text-xs text-green-600">
-                Both confirmed! Starting Swapanza...
-              </span>
+              <div className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm">
+                ✅ Both confirmed! Starting Swapanza...
+              </div>
             ) : userConfirmedSwapanza ? (
-              <span className="block text-xs">
-                Waiting for partner confirmation...
-              </span>
+              <div className="bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm">
+                ⏳ Waiting for partner confirmation...
+              </div>
             ) : null}
           </div>
         </div>
@@ -1289,119 +1299,133 @@ MemoizedMessage.displayName = "MemoizedMessage";
 
   if (loading)
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-        Loading...
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+            <p className="text-green-700 font-medium">Loading chat...</p>
+          </div>
+        </div>
       </div>
     );
   if (error)
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-        Error: {error}
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <div className="text-center py-12">
+            <div className="text-5xl mb-4">❌</div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Chat</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button onClick={onClose} className="btn-primary">Close</button>
+          </div>
+        </div>
       </div>
     );
   if (!chat)
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-        Chat not found
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <div className="text-center py-12">
+            <div className="text-5xl mb-4">🔍</div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Chat Not Found</h2>
+            <p className="text-gray-600 mb-4">The requested chat could not be found.</p>
+            <button onClick={onClose} className="btn-primary">Close</button>
+          </div>
+        </div>
       </div>
     );
 
   const allMessages = [...messages];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-md overflow-hidden flex flex-col">
-        <div className="p-4 border-b flex justify-between items-center">
-          <div className="flex items-center">
-            {otherParticipant && (
-              <div className="h-8 w-8 rounded-full bg-gray-300 mr-2 overflow-hidden">
-                {otherParticipant.profile_image_url ? (
-                  <img
-                    src={otherParticipant.profile_image_url}
-                    alt={otherParticipant.username}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center">
-                    <span className="text-sm">
-                      {otherParticipant.username[0]?.toUpperCase()}
-                    </span>
-                  </div>
-                )}
+    <div className="modal-overlay">
+      <div className="modal-content max-w-2xl">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              {otherParticipant && (
+                <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm mr-3 overflow-hidden ring-2 ring-white/30">
+                  {otherParticipant.profile_image_url ? (
+                    <img
+                      src={otherParticipant.profile_image_url}
+                      alt={otherParticipant.username}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center">
+                      <span className="text-sm font-bold">
+                        {otherParticipant.username[0]?.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div>
+                <h2 className="text-xl font-semibold">
+                  {isSwapanzaActive && chat?.participants
+                    ? chat.participants.find(
+                        (p) => Number(p.id) !== Number(currentUserId)
+                      )?.username || "Chat"
+                    : otherParticipant
+                    ? otherParticipant.username
+                    : "Chat"}
+                </h2>
+                <div className="flex items-center space-x-2 text-sm">
+                  <span className={`w-2 h-2 rounded-full ${
+                    connectionStatus === "connected" ? "bg-green-300" :
+                    connectionStatus === "connecting" ? "bg-yellow-300" :
+                    "bg-red-300"
+                  }`}></span>
+                  <span className="text-green-100">
+                    {connectionStatus === "connected" ? "Connected" :
+                     connectionStatus === "connecting" ? "Connecting..." :
+                     "Disconnected"}
+                  </span>
+                </div>
               </div>
-            )}
-            <div className="flex flex-col">
-              <h2 className="text-xl font-semibold">
-                {isSwapanzaActive && chat?.participants
-                  ? // During Swapanza, find the other participant and use their display name directly
-                    chat.participants.find(
-                      (p) => Number(p.id) !== Number(currentUserId)
-                    )?.username || "Chat"
-                  : // Normal display
-                  otherParticipant
-                  ? otherParticipant.username
-                  : "Chat"}
-              </h2>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              {!isSwapanzaActive && (
+                <button
+                  onClick={() => setShowSwapanzaOptions(true)}
+                  className="px-4 py-2 text-sm bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors duration-200 backdrop-blur-sm"
+                  title="Start Swapanza"
+                >
+                  🎭 Swapanza
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="text-white/80 hover:text-white transition-colors duration-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
             </div>
           </div>
-          <div className="flex items-center">
-            {!isSwapanzaActive && (
-              <button
-                onClick={() => setShowSwapanzaOptions(true)}
-                className="mr-3 px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
-                title="Start Swapanza"
-              >
-                Swapanza
-              </button>
-            )}
-            <span className="mr-2 text-sm">
-              {connectionStatus === "connected" ? (
-                <span className="text-green-500">●</span>
-              ) : connectionStatus === "connecting" ? (
-                <span className="text-yellow-500">●</span>
-              ) : (
-                <span className="text-red-500">●</span>
-              )}
-            </span>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
-            </button>
-          </div>
         </div>
-        <div
-          className="flex-1 overflow-y-auto p-4"
-          style={{ maxHeight: "60vh" }}
-        >
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50" style={{ maxHeight: "60vh" }}>
           {allMessages.length === 0 ? (
-            <div className="text-center text-gray-500 my-4">
-              No messages yet
+            <div className="text-center text-gray-500 my-8">
+              <div className="text-4xl mb-2">💬</div>
+              <p>No messages yet</p>
+              <p className="text-sm">Start the conversation!</p>
             </div>
           ) : (
             allMessages.map((msg) => {
-              const isCurrentUser =
-                Number(msg.sender) === Number(currentUserId);
+              const isCurrentUser = Number(msg.sender) === Number(currentUserId);
               return (
                 <div
                   key={msg.id}
                   className={
                     isCurrentUser
-                      ? "flex justify-end mb-2"
-                      : "flex justify-start mb-2"
+                      ? "flex justify-end mb-3"
+                      : "flex justify-start mb-3"
                   }
                 >
                   <MemoizedMessage
@@ -1416,43 +1440,48 @@ MemoizedMessage.displayName = "MemoizedMessage";
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Swapanza Section */}
         {renderSwapanzaSection()}
 
-        <div className="border-t p-2 flex">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-            placeholder={
-              isSwapanzaActive
-                ? "Max 7 chars, no spaces (2 msgs)"
-                : "Type a message..."
-            }
-            className="flex-1 border rounded-l p-2"
-          />
-          <button
-            onClick={sendMessage}
-            disabled={
-              !newMessage.trim() ||
-              connectionStatus !== "connected" ||
-              (isSwapanzaActive && remainingMessages <= 0)
-            }
-            className={`px-4 py-2 rounded-r ${
-              !newMessage.trim() ||
-              connectionStatus !== "connected" ||
-              (isSwapanzaActive && remainingMessages <= 0)
-                ? "bg-gray-300 text-gray-500"
-                : isSwapanzaActive
-                ? "bg-purple-500 text-white"
-                : "bg-blue-500 text-white"
-            }`}
-          >
-            Send
-          </button>
+        {/* Message Input */}
+        <div className="border-t bg-white p-4">
+          <div className="flex space-x-3">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+              placeholder={
+                isSwapanzaActive
+                  ? "Max 7 chars, no spaces (2 msgs)"
+                  : "Type a message..."
+              }
+              className="input-field flex-1"
+            />
+            <button
+              onClick={sendMessage}
+              disabled={
+                !newMessage.trim() ||
+                connectionStatus !== "connected" ||
+                (isSwapanzaActive && remainingMessages <= 0)
+              }
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                !newMessage.trim() ||
+                connectionStatus !== "connected" ||
+                (isSwapanzaActive && remainingMessages <= 0)
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : isSwapanzaActive
+                  ? "bg-purple-600 text-white hover:bg-purple-700 hover:shadow-lg transform hover:-translate-y-0.5"
+                  : "btn-primary"
+              }`}
+            >
+              Send
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Swapanza Modal */}
       {showSwapanzaModal && (
         <SwapanzaModal
           isOpen={showSwapanzaModal}
@@ -1464,42 +1493,48 @@ MemoizedMessage.displayName = "MemoizedMessage";
           userConfirmed={userConfirmedSwapanza}
         />
       )}
+
+      {/* Swapanza Options Modal */}
       {showSwapanzaOptions && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-80">
-            <h3 className="text-lg font-semibold mb-4">Start Swapanza</h3>
-            <p className="mb-4 text-sm">
-              Swap identities with your chat partner for the specified duration.
-              During Swapanza, each user can send up to 2 messages of max 7
-              characters with no spaces.
-            </p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">
-                Duration (minutes)
-              </label>
-              <select
-                value={swapanzaDuration}
-                onChange={(e) => setSwapanzaDuration(Number(e.target.value))}
-                className="w-full p-2 border rounded"
-              >
-                <option value={5}>5 minutes</option>
-                <option value={10}>10 minutes</option>
-                <option value={15}>15 minutes</option>
-              </select>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setShowSwapanzaOptions(false)}
-                className="px-4 py-2 border rounded hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={requestSwapanza}
-                className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
-              >
-                Start
-              </button>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">🎭 Start Swapanza</h3>
+              <p className="mb-6 text-gray-600">
+                Swap identities with your chat partner for the specified duration.
+                During Swapanza, each user can send up to 2 messages of max 7
+                characters with no spaces.
+              </p>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Duration (minutes)
+                </label>
+                <select
+                  value={swapanzaDuration}
+                  onChange={(e) => setSwapanzaDuration(Number(e.target.value))}
+                  className="input-field"
+                >
+                  <option value={5}>5 minutes</option>
+                  <option value={10}>10 minutes</option>
+                  <option value={15}>15 minutes</option>
+                </select>
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowSwapanzaOptions(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={requestSwapanza}
+                  className="btn-primary flex-1"
+                >
+                  Start Swapanza
+                </button>
+              </div>
             </div>
           </div>
         </div>

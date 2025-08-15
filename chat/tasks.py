@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 @shared_task
 def check_expired_swapanzas():
-    """Check for expired Swapanzas and deactivate them"""
+    """Check for expired Swapanzas and clean up stale invitations"""
     now = timezone.now()
     channel_layer = get_channel_layer()
     
@@ -66,6 +66,41 @@ def check_expired_swapanzas():
         except Exception as e:
             logger.error(f"Error deactivating chat Swapanza: {str(e)}")
     
+    # NEW: Clean up stale pending invitations (older than 10 minutes)
+    stale_threshold = now - timezone.timedelta(minutes=10)
+    stale_invites = Chat.objects.filter(
+        swapanza_requested_by__isnull=False,
+        swapanza_requested_at__lt=stale_threshold,
+        swapanza_active=False
+    )
+    
+    stale_count = 0
+    for chat in stale_invites:
+        try:
+            logger.info(f"[Stale Cleanup] Clearing stale invite in chat {chat.id} from {chat.swapanza_requested_by.username}")
+            chat.swapanza_requested_by = None
+            chat.swapanza_requested_at = None
+            chat.swapanza_confirmed_users = []
+            chat.swapanza_duration = None
+            chat.save(update_fields=[
+                'swapanza_requested_by', 'swapanza_requested_at', 
+                'swapanza_confirmed_users', 'swapanza_duration'
+            ])
+            stale_count += 1
+            
+            # Notify chat participants that stale invite was cleaned up
+            async_to_sync(channel_layer.group_send)(
+                f'chat_{chat.id}',
+                {
+                    'type': 'swapanza_cancel',
+                    'cancelled_by': None,  # System cleanup
+                    'cancelled_by_username': 'System',
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Error clearing stale invite: {str(e)}")
+    
     # Send notifications to all affected chats - this notifies users in the chat
     for chat_id in affected_chats:
         try:
@@ -107,5 +142,5 @@ def check_expired_swapanzas():
         except Exception as e:
             logger.error(f"Error sending logout notification to user {user_id}: {str(e)}")
     
-    return f"Reset {session_count} expired Swapanza sessions and {chat_count} chat Swapanzas. Affected {len(affected_users)} users."
+    return f"Reset {session_count} expired sessions, {chat_count} chat Swapanzas, and {stale_count} stale invites. Affected {len(affected_users)} users."
 

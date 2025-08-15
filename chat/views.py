@@ -17,6 +17,8 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404, render
 from rest_framework import filters, pagination
 from django.core.exceptions import ValidationError
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 User = get_user_model()
 
@@ -254,20 +256,56 @@ class ChatDetailView(generics.RetrieveUpdateAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        data = serializer.data
-
         
+        # Clean up any stale Swapanza state before returning data
         now = timezone.now()
+        needs_update = False
+        
+        # Check if there's a stale pending invite (older than 30 minutes)
+        if (instance.swapanza_requested_by and 
+            instance.swapanza_requested_at and 
+            not instance.swapanza_active):
+            stale_threshold = now - timezone.timedelta(minutes=30)
+            if instance.swapanza_requested_at < stale_threshold:
+                logger.info(f"Clearing stale Swapanza invite in chat {instance.id}")
+                instance.swapanza_requested_by = None
+                instance.swapanza_requested_at = None
+                instance.swapanza_confirmed_users = []
+                instance.swapanza_duration = None
+                needs_update = True
+        
+        # Check if Swapanza is expired but still marked as active
         swapanza_active = False
-
         if instance.swapanza_active and instance.swapanza_ends_at and instance.swapanza_ends_at > now:
             swapanza_active = True
-
+        elif instance.swapanza_active and (not instance.swapanza_ends_at or instance.swapanza_ends_at <= now):
+            # Swapanza is expired, clean it up
+            logger.info(f"Clearing expired Swapanza in chat {instance.id}")
+            instance.swapanza_active = False
+            instance.swapanza_started_at = None
+            instance.swapanza_ends_at = None
+            instance.swapanza_message_count = {}
+            needs_update = True
+        
+        if needs_update:
+            update_fields = []
+            if not swapanza_active:
+                update_fields.extend([
+                    'swapanza_active', 'swapanza_started_at', 'swapanza_ends_at', 'swapanza_message_count'
+                ])
+            if instance.swapanza_requested_by is None:
+                update_fields.extend([
+                    'swapanza_requested_by', 'swapanza_requested_at', 'swapanza_confirmed_users', 'swapanza_duration'
+                ])
+            instance.save(update_fields=update_fields)
+        
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        
+        # Add computed fields
         data['swapanza_active'] = swapanza_active
         if swapanza_active:
-            data['swapanza_ends_at'] = instance.swapanza_ends_at.isoformat(
-            ) if instance.swapanza_ends_at else None
+            data['swapanza_ends_at'] = instance.swapanza_ends_at.isoformat() if instance.swapanza_ends_at else None
             data['swapanza_message_count'] = instance.swapanza_message_count or {}
 
         return Response(data)
@@ -334,6 +372,110 @@ def reset_notifications(request):
 
 def index(request):
     return render(request, 'index.html')
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@csrf_exempt
+def cancel_swapanza(request):
+    """Cancel a pending Swapanza invitation for the current user.
+
+    Expects JSON body: { "chat_id": <int> }
+    The endpoint is CSRF-exempt because clients post using an Authorization header (JWT).
+    It will clear the pending invite and broadcast a cancellation over channels.
+    """
+    user = request.user
+    chat_id = request.data.get('chat_id')
+
+    if not chat_id:
+        return Response({'detail': 'chat_id is required'}, status=400)
+
+    try:
+        chat = Chat.objects.get(id=chat_id)
+    except Chat.DoesNotExist:
+        return Response({'detail': 'Chat not found'}, status=404)
+
+    if user not in chat.participants.all():
+        return Response({'detail': 'Not a participant of this chat'}, status=403)
+
+    # Any participant can cancel a pending invite
+    if not chat.swapanza_requested_by or chat.swapanza_active:
+        return Response({'detail': 'No pending swapanza to cancel'}, status=400)
+
+    try:
+        # Clear ALL server-side Swapanza state completely
+        instance_updated = False
+        
+        if chat.swapanza_requested_by:
+            chat.swapanza_requested_by = None
+            instance_updated = True
+            
+        if chat.swapanza_confirmed_users:
+            chat.swapanza_confirmed_users = []
+            instance_updated = True
+            
+        if chat.swapanza_requested_at:
+            chat.swapanza_requested_at = None
+            instance_updated = True
+            
+        if chat.swapanza_duration:
+            chat.swapanza_duration = None
+            instance_updated = True
+        
+        # Also clear any active Swapanza if it exists (in case of corruption)
+        if chat.swapanza_active:
+            chat.swapanza_active = False
+            chat.swapanza_started_at = None
+            chat.swapanza_ends_at = None
+            chat.swapanza_message_count = {}
+            instance_updated = True
+            
+            # Deactivate any active sessions
+            from .models import SwapanzaSession
+            SwapanzaSession.objects.filter(
+                chat=chat, 
+                active=True
+            ).update(active=False)
+        
+        if instance_updated:
+            chat.save(update_fields=[
+                'swapanza_requested_by', 'swapanza_confirmed_users', 
+                'swapanza_requested_at', 'swapanza_duration',
+                'swapanza_active', 'swapanza_started_at', 
+                'swapanza_ends_at', 'swapanza_message_count'
+            ])
+            
+        logger.info(f"Cleared all Swapanza state for chat {chat.id} by user {user.username}")
+
+        # Broadcast cancellation to chat group and notify other participants
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'chat_{chat.id}',
+            {
+                'type': 'swapanza_cancel',
+                'cancelled_by': user.id,
+                'cancelled_by_username': user.username,
+            },
+        )
+
+        participants = chat.participants.exclude(id=user.id)
+        for recipient in participants:
+            async_to_sync(channel_layer.group_send)(
+                f'user_{recipient.id}',
+                {
+                    'type': 'notify',
+                    'data': {
+                        'type': 'swapanza_cancel',
+                        'chat_id': chat.id,
+                        'from': user.username,
+                    },
+                },
+            )
+
+        return Response({'detail': 'Swapanza invitation cancelled'})
+    except Exception as e:
+        logger.error(f"Error cancelling swapanza via HTTP endpoint: {e}")
+        return Response({'detail': 'Server error'}, status=500)
 
 
 @api_view(['GET'])

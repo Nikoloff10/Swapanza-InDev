@@ -99,6 +99,8 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     setPartnerConfirmedSwapanza(false);
     setRemainingMessages(2);
     setSwapanzaEndTime(null);
+  // Clear any pending invite flag so UI banners disappear
+  setPendingSwapanzaInvite(false);
 
     if (swapanzaTimeLeftRef.current) {
       clearInterval(swapanzaTimeLeftRef.current);
@@ -195,25 +197,37 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
   useEffect(() => {
     if (hasPendingSwapanzaInvite) {
-      // Fetch chat details to get Swapanza invite info
       const fetchSwapanzaInvite = async () => {
         try {
           const token = localStorage.getItem('token');
+          const currentUserId = Number(localStorage.getItem('userId'));
           const response = await axios.get(`/api/chats/${chatId}/`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const chat = response.data;
           if (chat.swapanza_requested_by && chat.swapanza_duration) {
+            const isCurrentUserRequester = Number(chat.swapanza_requested_by) === currentUserId;
+            
             setIsSwapanzaRequested(true);
             setSwapanzaDuration(chat.swapanza_duration);
             setSwapanzaRequestedBy(chat.swapanza_requested_by);
-            setSwapanzaRequestedByUsername(chat.swapanza_requested_by_username || '');
-            setShowSwapanzaModal(true);
+            // Set username based on whether current user is requester
+            if (isCurrentUserRequester) {
+              setSwapanzaRequestedByUsername(localStorage.getItem("username") || "You");
+            } else {
+              const requester = chat.participants.find(p => Number(p.id) === Number(chat.swapanza_requested_by));
+              setSwapanzaRequestedByUsername(requester?.username || "Unknown");
+            }
+            
+            // Only show modal if user is recipient of the invite
+            if (!isCurrentUserRequester) {
+              setShowSwapanzaModal(true);
+            }
             setPendingSwapanzaInvite(true);
           }
         } catch (err) {
-          setShowSwapanzaModal(true); // fallback: show modal even if fetch fails
-          setPendingSwapanzaInvite(true);
+          console.error('Error fetching Swapanza invite:', err);
+          setPendingSwapanzaInvite(false);
         }
       };
       fetchSwapanzaInvite();
@@ -395,23 +409,24 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   const handleSwapanzaConfirm = useCallback(
     (data) => {
       console.log("Processing Swapanza confirmation:", data);
+      console.log("Current user ID:", currentUserId, "Confirming user ID:", data.user_id);
 
       const isCurrentUser = Number(data.user_id) === Number(currentUserId);
 
       // Update confirmation status
       if (isCurrentUser) {
+        console.log("Current user confirmed, setting userConfirmedSwapanza to true");
         setUserConfirmedSwapanza(true);
         // Close the modal when the current user confirms
         setShowSwapanzaModal(false);
       } else {
+        console.log("Partner confirmed, setting partnerConfirmedSwapanza to true");
         setPartnerConfirmedSwapanza(true);
       }
 
       // If server says all users are confirmed, we can prepare for activation
       if (data.all_confirmed) {
-        console.log(
-          "Server indicates all users confirmed, awaiting activation message"
-        );
+        console.log("Server indicates all users confirmed, preparing for activation");
 
         // Both are confirmed - reflects server state
         setUserConfirmedSwapanza(true);
@@ -670,6 +685,10 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
               case "swapanza.expire":
                 handleSwapanzaExpire();
                 break;
+              case "swapanza.cancel":
+                // Treat cancel like expire/reset so the recipient's UI clears pending invite
+                handleSwapanzaExpire();
+                break;
               case "swapanza.logout":
                 handleSwapanzaLogout();
                 break;
@@ -787,29 +806,27 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
             : Number(chatResponse.data.swapanza_requested_by)
         );
 
-        // Get requester's username if it's not the current user
-        if (!isCurrentUserRequester) {
-          const requester = chatResponse.data.participants.find(
-            (p) =>
-              Number(p.id) === Number(chatResponse.data.swapanza_requested_by)
-          );
-          setSwapanzaRequestedByUsername(requester?.username || "Unknown");
-          
-          // Show the SwapanzaModal to the recipient when chat is opened with a pending request
-          setShowSwapanzaModal(true);
-        } else {
-          // For the requester, set their own username
-          setSwapanzaRequestedByUsername(localStorage.getItem("username") || "You");
-        }
-
-        // Check if current user has already confirmed
+          // Get requester's username if it's not the current user
+          if (!isCurrentUserRequester) {
+            const requester = chatResponse.data.participants.find(
+              (p) =>
+                Number(p.id) === Number(chatResponse.data.swapanza_requested_by)
+            );
+            setSwapanzaRequestedByUsername(requester?.username || "Unknown");
+            // Never auto-open the modal when fetching chat details
+            setShowSwapanzaModal(false);
+          } else {
+            // For the requester, set their own username
+            setSwapanzaRequestedByUsername(localStorage.getItem("username") || "You");
+            setShowSwapanzaModal(false);
+          }        // Check if current user has already confirmed
         const confirmedUsers = chatResponse.data.swapanza_confirmed_users || [];
         setUserConfirmedSwapanza(
           confirmedUsers.includes(currentUserId.toString())
         );
 
         // Check if partner has confirmed
-        const partner = chat?.participants?.find(
+        const partner = chatResponse.data.participants.find(
           (p) => Number(p.id) !== Number(currentUserId)
         );
         if (partner) {
@@ -875,7 +892,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
       setError(error.message || "Failed to fetch chat");
       setLoading(false);
     }
-  }, [chatId, token, currentUserId, chat?.participants]);
+  }, [chatId, token, currentUserId]); // Removed chat?.participants dependency
 
   // Store in ref
   fetchChatRef.current = fetchChat;
@@ -1033,12 +1050,12 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
       // If allowed, proceed with Swapanza request
       if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(
-          JSON.stringify({
-            type: "swapanza.request",
-            duration: swapanzaDuration,
-          })
-        );
+        const swapanzaMessage = {
+          type: "swapanza.request",
+          duration: swapanzaDuration,
+        };
+        console.log("Sending Swapanza request:", swapanzaMessage);
+        ws.current.send(JSON.stringify(swapanzaMessage));
 
         setShowSwapanzaOptions(false);
         setIsSwapanzaRequested(true);
@@ -1056,15 +1073,43 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     }
   };
 
+  // Function to cancel a pending Swapanza request (sender only)
+  const cancelSwapanza = useCallback(async () => {
+    try {
+      // Try websocket first for immediate action
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({ type: 'swapanza.cancel' }));
+      } else {
+        // Fallback to HTTP API - assume endpoint exists server-side
+        await axios.post(
+          '/api/swapanza/cancel/',
+          { chat_id: chatId },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+
+      // Optimistically clear local Swapanza request state and UI
+      setIsSwapanzaRequested(false);
+      setShowSwapanzaModal(false);
+      setSwapanzaRequestedBy(null);
+      setSwapanzaRequestedByUsername(null);
+      setPendingSwapanzaInvite(false);
+      toast.info('Swapanza invitation cancelled');
+    } catch (err) {
+      console.error('Error cancelling Swapanza:', err);
+      toast.error('Could not cancel Swapanza invitation');
+    }
+  }, [chatId, token]);
+
   // Function to confirm participation in a Swapanza
   const confirmSwapanza = () => {
     console.log("Sending Swapanza confirmation");
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(
-        JSON.stringify({
-          type: "swapanza.confirm",
-        })
-      );
+      const confirmMessage = {
+        type: "swapanza.confirm",
+      };
+      console.log("Sending confirmation message:", confirmMessage);
+      ws.current.send(JSON.stringify(confirmMessage));
 
       
       setUserConfirmedSwapanza(true); 
@@ -1280,6 +1325,16 @@ MemoizedMessage.displayName = "MemoizedMessage";
               </button>
             )}
 
+            {/* If current user is the requester, allow cancelling the invite */}
+            {isCurrentUserRequester && (
+              <button
+                onClick={cancelSwapanza}
+                className="ml-3 px-4 py-2 bg-gray-200 text-gray-800 text-sm rounded-lg hover:bg-gray-300 transition-colors duration-200"
+              >
+                Cancel Invitation
+              </button>
+            )}
+
             {userConfirmedSwapanza && partnerConfirmedSwapanza ? (
               <div className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm">
                 ✅ Both confirmed! Starting Swapanza...
@@ -1407,6 +1462,31 @@ MemoizedMessage.displayName = "MemoizedMessage";
             </div>
           </div>
         </div>
+        {/* Invitation banner (shows when there is a pending Swapanza invite) */}
+        {pendingSwapanzaInvite && !showSwapanzaModal && (
+          <div className="border-t p-3 bg-yellow-50">
+            <div className="max-w-2xl mx-auto flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="text-2xl">🎭</div>
+                <div>
+                  <div className="font-semibold text-yellow-800">Swapanza invitation</div>
+                  <div className="text-sm text-yellow-700">{swapanzaRequestedByUsername ? `${swapanzaRequestedByUsername} invited you` : 'You have a Swapanza invitation'}</div>
+                </div>
+              </div>
+              <div>
+                <button
+                  onClick={() => {
+                    setShowSwapanzaModal(true);
+                    setPendingSwapanzaInvite(false);
+                  }}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-150"
+                >
+                  View Invitation
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 bg-gray-50" style={{ maxHeight: "60vh" }}>
@@ -1485,7 +1565,7 @@ MemoizedMessage.displayName = "MemoizedMessage";
       {showSwapanzaModal && (
         <SwapanzaModal
           isOpen={showSwapanzaModal}
-          onClose={() => setShowSwapanzaModal(false)}
+          onClose={cancelSwapanza}
           onConfirm={confirmSwapanza}
           requestedBy={swapanzaRequestedBy}
           requestedByUsername={swapanzaRequestedByUsername}

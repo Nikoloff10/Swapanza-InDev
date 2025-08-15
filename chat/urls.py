@@ -20,6 +20,7 @@ urlpatterns = [
 
     path('active-swapanza/', views.get_active_swapanza, name='active-swapanza'),
     path('can-start-swapanza/', views.can_start_swapanza, name='can-start-swapanza'),
+    path('swapanza/cancel/', views.cancel_swapanza, name='swapanza-cancel'),
 
     
 

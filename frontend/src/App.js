@@ -120,8 +120,9 @@ function App() {
         <header className="App-header">
           <div className="container">
             <div className="flex-between">
-              <Link to="/" className="text-decoration-none">
-                <h1>🌱 Swapanza</h1>
+              <Link to="/" className="text-decoration-none flex items-center space-x-3">
+                <img src="/logo.png" alt="Swapanza logo" width={40} height={40} style={{borderRadius: '8px'}} />
+                <h1>Swapanza</h1>
               </Link>
               {!isAuth && (
                 <div className="flex items-center space-x-4">

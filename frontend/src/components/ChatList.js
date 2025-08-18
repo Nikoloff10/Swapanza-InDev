@@ -11,11 +11,21 @@ function ChatList({ logout, username }) {
   const token = localStorage.getItem("token");
   const currentUserId = Number(localStorage.getItem("userId") || 0);
   const [chats, setChats] = useState([]);
+  // Persist locally-closed chat ids so they don't reappear from the server/ws
+  const [closedChatIds, setClosedChatIds] = useState(() => {
+    try {
+      return (JSON.parse(localStorage.getItem("closedChats") || "[]") || []).map((id) => id.toString());
+    } catch (e) {
+      console.error('Error reading closedChats from localStorage', e);
+      return [];
+    }
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [modalChatId, setModalChatId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [hasPendingSwapanzaInvite, setHasPendingSwapanzaInvite] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const searchTimeoutRef = useRef(null);
@@ -46,16 +56,22 @@ function ChatList({ logout, username }) {
   }, [fetchCurrentUserProfile]);
 
   // Get IDs of closed chats from localStorage
+  // Helper to return and persist closed chat IDs
+  const persistClosedChatIds = useCallback((ids) => {
+    const unique = Array.from(new Set((ids || []).map((i) => i.toString())));
+    localStorage.setItem("closedChats", JSON.stringify(unique));
+    setClosedChatIds(unique);
+  }, []);
+
+  // Read closed chat ids directly from localStorage for immediate consistency
   const getClosedChatIds = useCallback(() => {
     try {
-      return JSON.parse(localStorage.getItem("closedChats") || "[]").map((id) =>
-        id.toString()
-      );
+      const stored = JSON.parse(localStorage.getItem("closedChats") || "[]");
+      return (stored || []).map((id) => id.toString());
     } catch (e) {
-      console.error("Error parsing closedChats from localStorage:", e);
-      return [];
+      return closedChatIds;
     }
-  }, []);
+  }, [closedChatIds]);
 
   // Fetch unread message counts
   const fetchUnreadCounts = useCallback(async () => {
@@ -68,14 +84,13 @@ function ChatList({ logout, username }) {
 
       console.log("Unread counts received:", response.data);
 
-      // Get closed chats
-      const closedChatIds = getClosedChatIds();
-      console.log("Closed chat IDs:", closedChatIds);
+      // Filter out notifications for locally closed chats
+      const closed = getClosedChatIds();
+      console.log("Closed chat IDs:", closed);
 
-      // Filter out notifications for closed chats
       const filteredCounts = {};
       Object.entries(response.data).forEach(([chatId, count]) => {
-        if (!closedChatIds.includes(chatId.toString()) && count > 0) {
+        if (!closed.includes(chatId.toString()) && count > 0) {
           filteredCounts[chatId] = count;
         }
       });
@@ -126,6 +141,23 @@ function ChatList({ logout, username }) {
     setModalChatId(chatId);
     setIsModalOpen(true);
   }, []);
+
+  // enhanced open: sets pending invite flag and removes chat from closed ids if needed
+  const openModalEnhanced = useCallback((chatId) => {
+    setModalChatId(chatId);
+    setIsModalOpen(true);
+
+    // If this chat had a swapanza invite marker (-1) treat it as pending
+    const isInvite = unreadCounts[chatId] === -1;
+    setHasPendingSwapanzaInvite(!!isInvite);
+
+    // If the chat was locally closed, remove it from closed list so it will appear normally
+    const closed = getClosedChatIds();
+    if (closed.includes(chatId.toString())) {
+      const remaining = closed.filter((id) => id !== chatId.toString());
+      persistClosedChatIds(remaining);
+    }
+  }, [unreadCounts, getClosedChatIds, persistClosedChatIds]);
 
   // Create a chat with a user
   const createChat = useCallback(
@@ -187,7 +219,7 @@ function ChatList({ logout, username }) {
           setSearchResults([]);
 
           // Open the existing chat
-          openModal(existingChat.id);
+          openModalEnhanced(existingChat.id);
           return;
         }
 
@@ -209,12 +241,12 @@ function ChatList({ logout, username }) {
         setSearchResults([]);
 
         // Open the chat modal
-        openModal(response.data.id);
+  openModalEnhanced(response.data.id);
       } catch (error) {
         console.error("Error creating chat:", error);
       }
     },
-    [token, chats, openModal, getClosedChatIds]
+  [token, chats, openModalEnhanced, getClosedChatIds]
   );
 
   // Handle search input with debounce
@@ -245,12 +277,15 @@ function ChatList({ logout, username }) {
         headers: { Authorization: `Bearer ${token}` },
         params: { include_closed: true },
       });
-      setChats(response.data);
+  // filter out chats user closed locally
+  const closed = getClosedChatIds();
+  const filtered = (response.data || []).filter((c) => !closed.includes(c.id.toString()));
+  setChats(filtered);
     } catch (error) {
       console.error('Error fetching chats:', error);
       toast.error('Error fetching chats');
     }
-  }, [token]);
+  }, [token, getClosedChatIds]);
 
   // Fetch chats and unread counts once on mount
   useEffect(() => {
@@ -291,50 +326,39 @@ function ChatList({ logout, username }) {
   // Remove a chat (mark as closed)
   const removeChat = useCallback(
     (chatId) => {
-      // Just hide the chat, don't delete it
-      const closedChatIds = getClosedChatIds();
-      if (!closedChatIds.includes(chatId.toString())) {
-        localStorage.setItem(
-          "closedChats",
-          JSON.stringify([...closedChatIds, chatId.toString()])
-        );
+      // Mark chat as closed locally and remove from UI
+      const asStr = chatId.toString();
+      const closed = getClosedChatIds();
+      if (!closed.includes(asStr)) {
+        persistClosedChatIds([...closed, asStr]);
       }
 
-      // Remove from UI
       setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId));
 
-      // Update unread counts
       setUnreadCounts((prevCounts) => {
         const newCounts = { ...prevCounts };
         delete newCounts[chatId];
         return newCounts;
       });
     },
-    [getClosedChatIds]
+  [getClosedChatIds, persistClosedChatIds]
   );
 
   // Close all chats
   const closeAllChats = useCallback(() => {
     // Add all chat IDs to closed chats
     const allChatIds = chats.map((chat) => chat.id.toString());
+    const existingClosed = getClosedChatIds();
+    const combined = Array.from(new Set([...existingClosed, ...allChatIds]));
+    persistClosedChatIds(combined);
 
-    // Store in localStorage
-    const existingClosedChats = getClosedChatIds();
-    const combinedClosedChats = [
-      ...new Set([...existingClosedChats, ...allChatIds]),
-    ];
-    localStorage.setItem("closedChats", JSON.stringify(combinedClosedChats));
-
-    // Clear UI state
     setChats([]);
     setUnreadCounts({});
 
-    // Force refresh data from server to ensure UI is correct
-    setTimeout(() => {
-      fetchChats();
-      fetchUnreadCounts();
-    }, 300);
-  }, [chats, getClosedChatIds, fetchChats, fetchUnreadCounts]);
+  // Refresh immediately; fetchChats reads localStorage so new closed IDs are used
+  fetchChats();
+  fetchUnreadCounts();
+  }, [chats, getClosedChatIds, fetchChats, fetchUnreadCounts, persistClosedChatIds]);
 
   // Reset all notifications
   const resetAllNotifications = useCallback(async () => {
@@ -358,89 +382,158 @@ function ChatList({ logout, username }) {
   }, [token, fetchUnreadCounts]);
 
   // Calculate total unread messages
-  const totalUnreadMessages =
-    Object.values(unreadCounts).reduce((sum, count) => sum + count, 0) || 0;
+  const totalUnreadMessages = Object.values(unreadCounts).reduce((sum, count) => sum + (count > 0 ? count : 0), 0) || 0;
 
+  // WebSocket connection with exponential backoff and proper cleanup
   useEffect(() => {
     if (!token || !currentUserId) return;
-    const timeout = setTimeout(() => {
-      const host = window.location.hostname;
-      const wsUrl = `ws://${host}:8000/ws/notifications/?token=${token}`;
-      let ws = new window.WebSocket(wsUrl);
-      notificationWsRef.current = ws;
-      let pingInterval = null;
-      let pongTimeout = null;
 
-      function startPing() {
-        pingInterval = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-            pongTimeout = setTimeout(() => {
-              console.warn('No pong received in 15s, closing notification WebSocket');
-              ws.close();
-            }, 15000); // 15 seconds
-          }
-        }, 30000); // Ping every 30s
-      }
+    let ws = null;
+    let pingInterval = null;
+    let pongTimeout = null;
+    let reconnectTimeout = null;
+    let mountedRef = { current: true };
+    let reconnectAttempt = 0;
+    let isReconnecting = false;
 
-      ws.onopen = () => {
-        setWsConnected(true);
-        wsErrorShownRef.current = false; // Reset on successful connect
-        console.log('Notification WebSocket connected');
-        startPing();
-      };
-
-      ws.onclose = (e) => {
-        setWsConnected(false);
-        console.log('Notification WebSocket disconnected', e, 'code:', e.code, 'reason:', e.reason);
-        if (pingInterval) clearInterval(pingInterval);
-        if (pongTimeout) clearTimeout(pongTimeout);
-        if (e.code !== 1000 && !wsErrorShownRef.current) {
-          toast.error('Notification connection lost. Reconnecting...');
-          wsErrorShownRef.current = true;
-        }
-      };
-
-      ws.onerror = (e) => {
-        setWsConnected(false);
-        console.error('Notification WebSocket error:', e);
-        if (pingInterval) clearInterval(pingInterval);
-        if (pongTimeout) clearTimeout(pongTimeout);
-        if (!wsErrorShownRef.current) {
-          toast.error('Notification WebSocket error');
-          wsErrorShownRef.current = true;
-        }
-      };
-
-      ws.onmessage = (event) => {
+    const cleanup = () => {
+      if (pingInterval) clearInterval(pingInterval);
+      if (pongTimeout) clearTimeout(pongTimeout);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) {
         try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'pong') {
-            console.log('Notification WebSocket: received pong');
-            if (pongTimeout) clearTimeout(pongTimeout);
-            return;
-          }
-          // Example: { type: 'unread_count', chat_id: 5, count: 2 }
-          if (data.type === 'unread_count') {
-            setUnreadCounts((prev) => ({ ...prev, [data.chat_id]: data.count }));
-          }
-          // Example: { type: 'swapanza_invite', chat_id: 5, from: 'username' }
-          if (data.type === 'swapanza_invite') {
-            setUnreadCounts((prev) => ({ ...prev, [data.chat_id]: -1 }));
-            toast.info(`You have a Swapanza invite from ${data.from}! Click to view.`, {
-              onClick: () => openModal(data.chat_id),
-              autoClose: 6000,
-            });
-          }
-          // Add more notification types as needed
+          ws.close();
         } catch (err) {
-          console.error('Notification WebSocket: error parsing message', err);
+          console.warn('Error closing websocket:', err);
         }
-      };
-    }, 200); // 200ms delay
+        ws = null;
+      }
+    };
 
-    return () => clearTimeout(timeout);
-  }, [token, currentUserId, openModal]);
+    const startPing = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      
+      if (pingInterval) clearInterval(pingInterval);
+      if (pongTimeout) clearTimeout(pongTimeout);
+
+      // Send initial ping
+      ws.send(JSON.stringify({ type: 'ping' }));
+      
+      pingInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+          pongTimeout = setTimeout(() => {
+            console.warn('No pong received in 45s');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.close(3000, 'No pong received');
+            }
+          }, 45000); // More forgiving pong timeout
+        }
+      }, 60000); // Ping every 60s
+    };
+
+    const connect = () => {
+      if (isReconnecting || !mountedRef.current) return;
+      isReconnecting = true;
+
+      cleanup();
+
+      try {
+        const host = window.location.hostname;
+        const wsUrl = `ws://${host}:8000/ws/notifications/?token=${token}`;
+        ws = new WebSocket(wsUrl);
+        notificationWsRef.current = ws;
+
+        ws.onopen = () => {
+          if (!mountedRef.current) return;
+          console.log('WebSocket connected');
+          setWsConnected(true);
+          wsErrorShownRef.current = false;
+          reconnectAttempt = 0;
+          isReconnecting = false;
+          startPing();
+        };
+
+        ws.onclose = (e) => {
+          if (!mountedRef.current) return;
+          console.log('WebSocket closed:', e.code, e.reason);
+          setWsConnected(false);
+          cleanup();
+
+          if (e.code !== 1000 && !wsErrorShownRef.current) {
+            wsErrorShownRef.current = true;
+            if (e.code === 3000) {
+              console.log('Reconnecting due to missed pong');
+            } else {
+              toast.error('Connection lost. Reconnecting...');
+            }
+          }
+
+          // Only reconnect if not unmounted and connection wasn't closed cleanly
+          if (mountedRef.current && e.code !== 1000) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempt++), 30000);
+            console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempt})`);
+            isReconnecting = false;
+            reconnectTimeout = setTimeout(connect, delay);
+          }
+        };
+
+        ws.onerror = (e) => {
+          if (!mountedRef.current) return;
+          console.error('WebSocket error:', e);
+        };
+
+        ws.onmessage = (event) => {
+          if (!mountedRef.current) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'pong') {
+              if (pongTimeout) clearTimeout(pongTimeout);
+              return;
+            }
+
+            // Filter notifications for closed chats
+            const closed = getClosedChatIds();
+            const chatIdStr = data.chat_id?.toString();
+            if (chatIdStr && closed.includes(chatIdStr)) {
+              console.log('Ignoring notification for closed chat:', chatIdStr);
+              return;
+            }
+
+            // Handle notifications
+            if (data.type === 'unread_count') {
+              setUnreadCounts(prev => ({ ...prev, [data.chat_id]: data.count }));
+            } else if (data.type === 'swapanza_invite') {
+              setUnreadCounts(prev => ({ ...prev, [data.chat_id]: -1 }));
+              toast.info(`Swapanza invite from ${data.from}! Click to view.`, {
+                onClick: () => openModalEnhanced(Number(data.chat_id)),
+                autoClose: 6000
+              });
+            }
+          } catch (err) {
+            console.error('Error handling message:', err);
+          }
+        };
+      } catch (err) {
+        console.error('Error creating WebSocket:', err);
+        isReconnecting = false;
+        if (mountedRef.current) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempt++), 30000);
+          reconnectTimeout = setTimeout(connect, delay);
+        }
+      }
+    };
+
+    // Initial connection
+    mountedRef.current = true;
+    setTimeout(connect, 200);
+
+    // Cleanup function
+    return () => {
+      mountedRef.current = false;
+      cleanup();
+    };
+  }, [token, currentUserId, openModalEnhanced, getClosedChatIds]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100">
@@ -690,9 +783,10 @@ function ChatList({ logout, username }) {
       {isModalOpen && modalChatId && (
         <ChatModal
           chatId={modalChatId}
-          hasPendingSwapanzaInvite={false}
+          hasPendingSwapanzaInvite={hasPendingSwapanzaInvite}
           onClose={() => {
             setIsModalOpen(false);
+            setHasPendingSwapanzaInvite(false);
             // Fetch chats and unread counts when closing the modal
             fetchChats();
             fetchUnreadCounts();

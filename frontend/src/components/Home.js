@@ -13,19 +13,19 @@ const Home = () => {
 
   const features = [
     {
-      icon: '💬',
-      title: 'Smart Chat System',
-      description: 'Intelligent conversations with context-aware responses and real-time messaging.'
+     
+      title: 'It is fun (at least it is supposed to be)',
+      description: 'Wanna chat with the whole crew or just couple of friends? You can do it the entertaining way.'
     },
     {
-      icon: '🔄',
+    
       title: 'Swapanza Sessions',
       description: 'Unique identity-swapping experiences for enhanced privacy and fun interactions.'
     },
     {
-      icon: '📱',
+     
       title: 'Modern Interface',
-      description: 'Beautiful, responsive design that works seamlessly across all devices.'
+      description: 'Beautiful-ish, responsive design that works (almost)seamlessly across all devices.'
     }
   ];
 
@@ -85,7 +85,7 @@ const Home = () => {
               Ready to Start Your Journey?
             </h2>
             <p className="text-lg text-gray-600 mb-8">
-              Join thousands of users who are already experiencing the future of social interaction.
+              Join the fun, the more people to mess with - the better.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/register" className="btn-primary text-lg px-8 py-4">
@@ -105,7 +105,7 @@ const Home = () => {
           <div className="text-center">
             <h3 className="text-xl font-semibold mb-2">Swapanza</h3>
             <p className="text-gray-400 mb-6">
-              Redefining social interaction, one conversation at a time.
+              Built to respect your privacy and entertain your soul.
             </p>
           </div>
         </div>

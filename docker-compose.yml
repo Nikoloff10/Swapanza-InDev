@@ -74,7 +74,7 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:8000
 
-  # Celery Worker (optional - for background tasks)
+  # Celery Worker (for background tasks)
   celery:
     build:
       context: .
@@ -95,6 +95,30 @@ services:
       redis:
         condition: service_healthy
     command: celery -A swapanzaBackend worker --loglevel=info
+
+  # Celery Beat (for scheduled tasks like cleanup)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: swapanzaBackend/Dockerfile
+    environment:
+      - DJANGO_SETTINGS_MODULE=swapanzaBackend.settings
+      - DJANGO_SECRET_KEY=django-insecure-sh%pzqu4(zfuax&i(uglk&nhd5d#&4msx!+&l=_s$!%73*_s(l
+      - DJANGO_DEBUG=True
+      - DATABASE_URL=postgresql://postgres:bakugan2005@db:5432/swapanza
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./staticfiles:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery:
+        condition: service_started
+    command: celery -A swapanzaBackend beat --loglevel=info
 
 volumes:
   postgres_data:

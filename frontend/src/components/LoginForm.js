@@ -21,22 +21,21 @@ function LoginForm({ login }) {
 
       const token = response.data.access;
 
-      // Fetch user details from /api/profile/
+    
       const profileResponse = await axios.get('/api/profile/', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      const userId = profileResponse.data.id; // Extract user ID from profile
-
+      const userId = profileResponse.data.id; 
       localStorage.setItem('token', token);
       localStorage.setItem('username', username);
       localStorage.setItem('userId', userId.toString());
       console.log("LoginForm: userId set to localStorage:", userId);
       login(token, username, userId);
 
-      toast.success('Welcome back! 🎉');
+      toast.success(`Welcome back, ${username}!`);
       navigate('/chats', { replace: true });
 
     } catch (error) {
@@ -51,7 +50,6 @@ function LoginForm({ login }) {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🔐</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
           <p className="text-gray-600">Sign in to your Swapanza account</p>
         </div>

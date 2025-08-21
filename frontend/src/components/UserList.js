@@ -32,7 +32,6 @@ function UserList() {
       const response = await axios.post('/api/chats/', { user: userId });
       toast.success('Chat started!');
       // Redirect to the chat room or update the chat list
-      // For now, we'll just toast success
       console.log('Chat started:', response.data);
     } catch (error) {
       console.error(error);

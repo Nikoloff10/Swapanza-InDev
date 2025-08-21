@@ -90,7 +90,7 @@ function Profile({ logout, username }) {
       );
       setProfile({ ...profile, bio: response.data.bio });
       setEditingBio(false);
-      toast.success('Bio updated successfully! ✨');
+      toast.success('Bio updated successfully!');
     } catch (error) {
       console.error('Error updating bio:', error);
       toast.error('Failed to update bio. Please try again.');
@@ -249,7 +249,7 @@ function Profile({ logout, username }) {
             {/* Action Buttons */}
             <div className="space-y-3">
               <Link to="/chats" className="btn-primary w-full text-center">
-                💬 Back to Chats
+                Back to Chats
               </Link>
               
               {isOwnProfile && (
@@ -257,7 +257,7 @@ function Profile({ logout, username }) {
                   onClick={logout}
                   className="btn-danger w-full"
                 >
-                  🚪 Logout
+                  Logout
                 </button>
               )}
             </div>

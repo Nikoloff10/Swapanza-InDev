@@ -43,11 +43,10 @@ function SwapanzaModal({
   
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6">
           <div className="text-center">
-            <div className="text-5xl mb-4">🎭</div>
             <h2 className="text-2xl font-bold mb-2">Swapanza Invitation</h2>
             <p className="text-purple-100">
               {requestedBy === 'you' ? (

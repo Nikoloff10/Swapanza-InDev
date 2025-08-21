@@ -91,6 +91,6 @@ code {
   }
   
   .modal-content {
-    @apply bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto;
+    @apply bg-white rounded-xl shadow-2xl max-w-md w-full mx-4;
   }
 }

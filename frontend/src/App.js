@@ -30,10 +30,10 @@ function Navigation({ isAuth, username, logout }) {
         <div className="flex-between py-4">
           <div className="flex items-center space-x-8">
             <Link to="/chats" className="text-green-600 hover:text-green-700 font-medium transition-colors">
-              💬 Chats
+              Chats
             </Link>
             <Link to="/profile" className="text-green-600 hover:text-green-700 font-medium transition-colors">
-              👤 Profile
+              Profile
             </Link>
           </div>
           <div className="flex items-center space-x-4">

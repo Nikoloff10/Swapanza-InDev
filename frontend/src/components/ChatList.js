@@ -562,7 +562,7 @@ function ChatList({ logout, username }) {
                 </div>
                 
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">💬 Chats</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">Chats</h1>
                   <p className="text-gray-600 text-sm">Welcome back, {username}!</p>
                 </div>
               </div>
@@ -638,7 +638,7 @@ function ChatList({ logout, username }) {
                                       ? 'bg-purple-100 text-purple-800' 
                                       : 'bg-green-100 text-green-800'
                                   } text-xs font-medium px-3 py-1 rounded-full`}>
-                                    {isSwapanzaInvite ? '🎭 Swapanza' : `${count} new`}
+                                    {isSwapanzaInvite ? 'Swapanza' : `${count} new`}
                                   </span>
                                 </div>
                               </div>

@@ -140,18 +140,18 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
           profile_image: response.data.partner_profile_image,
         });
 
-        // Update the time left
+     
         const now = new Date();
         const endsAt = new Date(response.data.ends_at);
         const diff = Math.max(0, Math.floor((endsAt - now) / 1000));
         setTimeLeft(diff);
 
-        // Start the countdown timer if needed
+       
         if (!swapanzaTimeLeftRef.current) {
           setupSwapanzaTimer(endsAt);
         }
       } else if (!chat?.swapanza_active && !pendingSwapanzaInvite && !isSwapanzaRequested) {
-        // Only reset if we're not in a chat-specific Swapanza, no pending invite, and no pending request
+        
         resetSwapanza();
       }
     } catch (error) {
@@ -190,7 +190,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
       return () => clearTimeout(cleanupTimeout);
     } else if (!isSwapanzaActive) {
-      // Clean up when Swapanza ends manually
+      
       localStorage.removeItem("activeSwapanza");
     }
   }, [isSwapanzaActive, swapanzaEndTime, swapanzaPartner, chatId]);
@@ -369,7 +369,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
       redirectToLogin();
       return false;
     } catch (error) {
-      console.warn('Session expired. Please log in again.'); // TODO: Replace with toast notification
+      console.warn('Session expired. Please log in again.'); 
       toast.error('Session expired. Please log in again.');
       redirectToLogin();
       return false;
@@ -631,7 +631,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
             switch (data.type) {
               case "chat.message": {
-                // Extract message data - either from data.message object or from data itself
+                
                 const messageData = data.message || data;
 
                 // Always update remaining messages if this is during Swapanza
@@ -656,18 +656,18 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
                 handleMessagesRead(data);
                 break;
               case "chat.message.error":
-                // Handle message validation error
-                console.warn(data.message || "Failed to send message"); // TODO: Replace with toast notification
+                
+                console.warn(data.message || "Failed to send message"); 
                 toast.error(data.message || "Failed to send message");
 
-                // Remove the pending message from the UI
+                
                 setMessages((prevMessages) =>
                   prevMessages.filter(
                     (msg) => !(msg.pending && msg.content === data.content)
                   )
                 );
 
-                // Remove from pendingMessages ref
+           
                 pendingMessages.current = pendingMessages.current.filter(
                   (msg) => msg.content !== data.content
                 );
@@ -686,7 +686,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
                 handleSwapanzaExpire();
                 break;
               case "swapanza.cancel":
-                // Treat cancel like expire/reset so the recipient's UI clears pending invite
+                
                 handleSwapanzaExpire();
                 break;
               case "swapanza.logout":
@@ -892,9 +892,9 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
       setError(error.message || "Failed to fetch chat");
       setLoading(false);
     }
-  }, [chatId, token, currentUserId]); // Removed chat?.participants dependency
+  }, [chatId, token, currentUserId]); 
 
-  // Store in ref
+
   fetchChatRef.current = fetchChat;
 
   useEffect(() => {
@@ -1229,10 +1229,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
             <span className="font-medium">{isCurrentUser ? "You" : displayUsername}</span>
             <div className="flex items-center space-x-2">
               {isPending && (
-                <span className="text-xs italic text-yellow-600">⏳ Sending...</span>
-              )}
-              {isDuringSwapanza && (
-                <span className="text-xs font-bold bg-purple-200 text-purple-800 px-2 py-1 rounded-full">🎭</span>
+                <span className="text-xs italic text-yellow-600">Sending...</span>
               )}
             </div>
           </div>
@@ -1265,7 +1262,6 @@ MemoizedMessage.displayName = "MemoizedMessage";
         <div className="border-t p-4 bg-gradient-to-r from-purple-50 to-purple-100">
           <div className="text-center">
             <div className="flex items-center justify-center space-x-2 mb-2">
-              <span className="text-2xl">🎭</span>
               <span className="text-lg font-bold text-purple-800">Swapanza Active!</span>
             </div>
             
@@ -1300,7 +1296,6 @@ MemoizedMessage.displayName = "MemoizedMessage";
         <div className="border-t p-4 bg-gradient-to-r from-yellow-50 to-yellow-100">
           <div className="text-center">
             <div className="flex items-center justify-center space-x-2 mb-3">
-              <span className="text-2xl">🎭</span>
               <span className="text-lg font-bold text-yellow-800">
                 {isCurrentUserRequester ? "Swapanza Request Sent" : "Swapanza Invitation"}
               </span>
@@ -1355,10 +1350,12 @@ MemoizedMessage.displayName = "MemoizedMessage";
   if (loading)
     return (
       <div className="modal-overlay">
-        <div className="modal-content">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-            <p className="text-green-700 font-medium">Loading chat...</p>
+        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+              <p className="text-green-700 font-medium">Loading chat...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1366,12 +1363,14 @@ MemoizedMessage.displayName = "MemoizedMessage";
   if (error)
     return (
       <div className="modal-overlay">
-        <div className="modal-content">
-          <div className="text-center py-12">
-            <div className="text-5xl mb-4">❌</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Chat</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button onClick={onClose} className="btn-primary">Close</button>
+        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center py-12">
+              <div className="text-5xl mb-4">❌</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Chat</h2>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <button onClick={onClose} className="btn-primary">Close</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1379,12 +1378,14 @@ MemoizedMessage.displayName = "MemoizedMessage";
   if (!chat)
     return (
       <div className="modal-overlay">
-        <div className="modal-content">
-          <div className="text-center py-12">
-            <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Chat Not Found</h2>
-            <p className="text-gray-600 mb-4">The requested chat could not be found.</p>
-            <button onClick={onClose} className="btn-primary">Close</button>
+        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center py-12">
+              <div className="text-5xl mb-4">🔍</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Chat Not Found</h2>
+              <p className="text-gray-600 mb-4">The requested chat could not be found.</p>
+              <button onClick={onClose} className="btn-primary">Close</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1394,9 +1395,9 @@ MemoizedMessage.displayName = "MemoizedMessage";
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content max-w-2xl">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4">
+        <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-t-xl flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {otherParticipant && (
@@ -1448,7 +1449,7 @@ MemoizedMessage.displayName = "MemoizedMessage";
                   className="px-4 py-2 text-sm bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors duration-200 backdrop-blur-sm"
                   title="Start Swapanza"
                 >
-                  🎭 Swapanza
+                  Swapanza
                 </button>
               )}
               <button
@@ -1464,10 +1465,9 @@ MemoizedMessage.displayName = "MemoizedMessage";
         </div>
         {/* Invitation banner (shows when there is a pending Swapanza invite) */}
         {pendingSwapanzaInvite && !showSwapanzaModal && (
-          <div className="border-t p-3 bg-yellow-50">
+          <div className="border-t p-3 bg-yellow-50 flex-shrink-0">
             <div className="max-w-2xl mx-auto flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="text-2xl">🎭</div>
                 <div>
                   <div className="font-semibold text-yellow-800">Swapanza invitation</div>
                   <div className="text-sm text-yellow-700">{swapanzaRequestedByUsername ? `${swapanzaRequestedByUsername} invited you` : 'You have a Swapanza invitation'}</div>
@@ -1489,10 +1489,9 @@ MemoizedMessage.displayName = "MemoizedMessage";
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50" style={{ maxHeight: "60vh" }}>
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
           {allMessages.length === 0 ? (
             <div className="text-center text-gray-500 my-8">
-              <div className="text-4xl mb-2">💬</div>
               <p>No messages yet</p>
               <p className="text-sm">Start the conversation!</p>
             </div>
@@ -1521,10 +1520,12 @@ MemoizedMessage.displayName = "MemoizedMessage";
         </div>
 
         {/* Swapanza Section */}
-        {renderSwapanzaSection()}
+        <div className="flex-shrink-0">
+          {renderSwapanzaSection()}
+        </div>
 
         {/* Message Input */}
-        <div className="border-t bg-white p-4">
+        <div className="border-t bg-white p-4 flex-shrink-0 rounded-b-xl">
           <div className="flex space-x-3">
             <input
               type="text"
@@ -1577,9 +1578,9 @@ MemoizedMessage.displayName = "MemoizedMessage";
       {/* Swapanza Options Modal */}
       {showSwapanzaOptions && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">🎭 Start Swapanza</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Start Swapanza</h3>
               <p className="mb-6 text-gray-600">
                 Swap identities with your chat partner for the specified duration.
                 During Swapanza, each user can send up to 2 messages of max 7

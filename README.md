@@ -112,15 +112,36 @@ cd Swapanza
 ## Environment Variables
 Create a `.env` file in the project root with the following (example):
 ```
-DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
-CORS_ALLOW_ALL_ORIGINS=False
-CORS_ALLOWED_ORIGINS=http://localhost:3000
-CSRF_TRUSTED_ORIGINS=http://localhost:3000
-SECRET_KEY=your-secret-key
-DATABASE_URL=your-database-url
+# Database Configuration
+POSTGRES_DB=swapanza
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_secure_password_here
+
+# Cloudinary Configuration (Get these from your Cloudinary dashboard)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Django Configuration
+DJANGO_SETTINGS_MODULE=swapanzaBackend.settings
+DJANGO_SECRET_KEY=your-secret-key-here-generate-a-new-one
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:80,http://frontend:80
+CORS_ALLOW_CREDENTIALS=True
+
+# Frontend Configuration
+REACT_APP_API_URL=http://localhost:8000
+
+# Database and Redis URLs (for Docker)
+DATABASE_URL=postgresql://postgres:your_secure_password_here@db:5432/swapanza
+REDIS_URL=redis://redis:6379/0
+
+# Celery Configuration
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
 ```
-- **Never set DEBUG=True in production!**
+
 - Set your production domain(s) in `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, and `CSRF_TRUSTED_ORIGINS`.
 
 ---
@@ -156,14 +177,9 @@ DATABASE_URL=your-database-url
 
 ---
 
-## Contributing
-- Please lint and format your code before submitting PRs:
-  - Frontend: `npm run lint` and `npm run format`
-  - Backend: `black .` and `flake8`
-
----
 
 ## License
 MIT
 ````
+
 

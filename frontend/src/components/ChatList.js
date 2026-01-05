@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { FaBell, FaUser, FaSearch, FaTimes, FaPlus } from "react-icons/fa";
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
+import { INTERVALS, WS_CODES } from '../constants';
 
 function ChatList() {
   const { token, userId: currentUserId, logout, username } = useAuth();
@@ -300,7 +301,7 @@ function ChatList() {
       interval = setInterval(() => {
         fetchChats();
         fetchUnreadCounts();
-      }, 30000);
+      }, INTERVALS.SWAPANZA_STATE_CHECK_MS);
       console.log('Polling effect: wsConnected = false (polling active)');
     } else {
       console.log('Polling effect: wsConnected = true (no polling)');
@@ -460,7 +461,7 @@ function ChatList() {
           setWsConnected(false);
           cleanup();
 
-          if (e.code !== 1000 && !wsErrorShownRef.current) {
+          if (e.code !== WS_CODES.NORMAL_CLOSURE && !wsErrorShownRef.current) {
             wsErrorShownRef.current = true;
             if (e.code === 3000) {
               console.log('Reconnecting due to missed pong');
@@ -470,8 +471,11 @@ function ChatList() {
           }
 
           // Only reconnect if not unmounted and connection wasn't closed cleanly
-          if (mountedRef.current && e.code !== 1000) {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempt++), 30000);
+          if (mountedRef.current && e.code !== WS_CODES.NORMAL_CLOSURE) {
+            const delay = Math.min(
+              WS_CODES.RECONNECT_BASE_MS * Math.pow(2, reconnectAttempt++),
+              INTERVALS.WS_MAX_RECONNECT_DELAY_MS
+            );
             console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempt})`);
             isReconnecting = false;
             reconnectTimeout = setTimeout(connect, delay);
@@ -518,7 +522,10 @@ function ChatList() {
         console.error('Error creating WebSocket:', err);
         isReconnecting = false;
         if (mountedRef.current) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempt++), 30000);
+          const delay = Math.min(
+            WS_CODES.RECONNECT_BASE_MS * Math.pow(2, reconnectAttempt++),
+            INTERVALS.WS_MAX_RECONNECT_DELAY_MS
+          );
           reconnectTimeout = setTimeout(connect, delay);
         }
       }

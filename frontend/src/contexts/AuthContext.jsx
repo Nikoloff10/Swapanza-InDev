@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { setupTokenExpirationChecker, validateToken } from '../utils/tokenUtils';
+import { INTERVALS } from '../constants';
 
 export const AuthContext = createContext(null);
 
@@ -59,7 +60,7 @@ export function AuthProvider({ children }) {
     initializeAuth();
 
     // Set up periodic token checking
-    const cleanup = setupTokenExpirationChecker(30000); // Check every 30 seconds
+    const cleanup = setupTokenExpirationChecker(INTERVALS.TOKEN_CHECK_MS);
     
     return () => cleanup();
   }, [logout]);

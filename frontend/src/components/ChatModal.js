@@ -12,6 +12,7 @@ import { redirectToLogin } from '../utils/tokenUtils';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
+import { SWAPANZA, INTERVALS, WS_CODES } from '../constants';
 
 function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSwapanzaInvite }) {
   const { token, userId: currentUserId, username } = useAuth();
@@ -83,7 +84,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     };
 
     updateTimeLeft(); 
-    swapanzaTimeLeftRef.current = setInterval(updateTimeLeft, 1000);
+    swapanzaTimeLeftRef.current = setInterval(updateTimeLeft, INTERVALS.COUNTDOWN_TICK_MS);
   }, []);
 
   
@@ -95,7 +96,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     setSwapanzaRequestedByUsername(null);
     setUserConfirmedSwapanza(false);
     setPartnerConfirmedSwapanza(false);
-    setRemainingMessages(2);
+    setRemainingMessages(SWAPANZA.MESSAGE_LIMIT);
     setSwapanzaEndTime(null);
   // Clear any pending invite flag so UI banners disappear
   setPendingSwapanzaInvite(false);
@@ -161,8 +162,8 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   useEffect(() => {
     fetchGlobalSwapanzaState();
 
-    // Check every 30 seconds
-    const intervalId = setInterval(fetchGlobalSwapanzaState, 30000);
+    // Poll periodically while mounted
+    const intervalId = setInterval(fetchGlobalSwapanzaState, INTERVALS.SWAPANZA_STATE_CHECK_MS);
 
     return () => clearInterval(intervalId);
   }, [fetchGlobalSwapanzaState]);
@@ -456,7 +457,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
       ) {
         setRemainingMessages(Math.max(data.remaining_messages, 0));
       } else {
-        setRemainingMessages(2);
+        setRemainingMessages(SWAPANZA.MESSAGE_LIMIT);
       }
   
       // Clear confirmation state
@@ -506,7 +507,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
       };
   
       updateTimeLeft();
-      swapanzaTimeLeftRef.current = setInterval(updateTimeLeft, 1000);
+      swapanzaTimeLeftRef.current = setInterval(updateTimeLeft, INTERVALS.COUNTDOWN_TICK_MS);
   
       // Store minimal state in localStorage
       localStorage.setItem(
@@ -514,7 +515,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         JSON.stringify({
           active: true,
           endsAt: endsAt.toISOString(),
-          remainingMessages: data.remaining_messages || 2,
+          remainingMessages: data.remaining_messages || SWAPANZA.MESSAGE_LIMIT,
         })
       );
     },
@@ -703,11 +704,14 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
           console.log("WebSocket closed:", e);
           setConnectionStatus("disconnected");
 
-          if (e.code !== 1000) {
-            const timeout = Math.min(1000 * 2 ** wsRetryCount.current, 30000);
+          if (e.code !== WS_CODES.NORMAL_CLOSURE) {
+            const timeout = Math.min(
+              WS_CODES.RECONNECT_BASE_MS * 2 ** wsRetryCount.current,
+              INTERVALS.WS_MAX_RECONNECT_DELAY_MS
+            );
             wsRetryCount.current += 1;
 
-            console.log(`Reconnecting in ${timeout / 1000} seconds...`);
+            console.log(`Reconnecting in ${timeout / WS_CODES.RECONNECT_BASE_MS} seconds...`);
             setTimeout(() => {
               if (document.visibilityState === "visible") {
                 if (setupWebSocketRef.current) {
@@ -742,7 +746,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     // Cleanup function when component unmounts
     return () => {
       if (ws.current) {
-        ws.current.close(1000, "Component unmounted");
+        ws.current.close(WS_CODES.NORMAL_CLOSURE, "Component unmounted");
       }
 
       if (swapanzaTimeLeftRef.current) {
@@ -903,7 +907,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
     return () => {
       if (ws.current) {
-        ws.current.close(1000, "Component unmounted");
+        ws.current.close(WS_CODES.NORMAL_CLOSURE, "Component unmounted");
       }
 
       if (swapanzaTimeLeftRef.current) {
@@ -923,7 +927,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
     return () => {
       if (ws.current) {
-        ws.current.close(1000, "Component unmounted");
+        ws.current.close(WS_CODES.NORMAL_CLOSURE, "Component unmounted");
       }
 
       if (swapanzaTimeLeftRef.current) {

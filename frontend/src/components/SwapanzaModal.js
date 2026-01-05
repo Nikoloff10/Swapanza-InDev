@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaClock, FaInfoCircle, FaCheck, FaTimes } from 'react-icons/fa';
+import { SWAPANZA, INTERVALS } from '../constants';
 
 function SwapanzaModal({
   isOpen,
@@ -10,13 +11,13 @@ function SwapanzaModal({
   duration,
   userConfirmed,
 }) {
-  const [timeLeft, setTimeLeft] = useState(30); // 30 seconds countdown
+  const [timeLeft, setTimeLeft] = useState(SWAPANZA.INVITE_TIMEOUT_SECONDS);
   const timerRef = useRef(null);
   
   useEffect(() => {
     if (isOpen) {
       // Reset timer when modal opens
-      setTimeLeft(30);
+      setTimeLeft(SWAPANZA.INVITE_TIMEOUT_SECONDS);
       
       // Start countdown
       timerRef.current = setInterval(() => {
@@ -29,7 +30,7 @@ function SwapanzaModal({
           }
           return newValue;
         });
-      }, 1000);
+      }, INTERVALS.COUNTDOWN_TICK_MS);
     }
     
     return () => {

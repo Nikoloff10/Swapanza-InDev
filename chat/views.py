@@ -540,7 +540,9 @@ def get_active_swapanza(request):
         'remaining_messages':
         remaining_messages,
         'chat_id':
-        session_chat.id if session_chat else None
+        session_chat.id if session_chat else None,
+        'server_time':
+        now.isoformat()
     })
 
 

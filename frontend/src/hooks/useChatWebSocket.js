@@ -1,0 +1,154 @@
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { WS_CODES, INTERVALS } from '../constants';
+
+/**
+ * Custom hook to manage WebSocket connection for chat
+ * Handles connection, reconnection, and message sending
+ */
+export function useChatWebSocket({ chatId, token, onMessage, onMessagesRead, onOpen }) {
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const ws = useRef(null);
+  const wsRetryCount = useRef(0);
+  const setupWebSocketRef = useRef(null);
+
+  // Check if token is expired
+  const isTokenExpired = useCallback((tokenStr) => {
+    try {
+      const payloadBase64 = tokenStr.split('.')[1];
+      if (!payloadBase64) return true;
+
+      const payload = JSON.parse(atob(payloadBase64));
+      if (payload.exp) {
+        return Date.now() >= payload.exp * 1000;
+      }
+      return false;
+    } catch (e) {
+      console.error('Error checking token expiration:', e);
+      return true;
+    }
+  }, []);
+
+  // Setup WebSocket connection
+  const setupWebSocket = useCallback(() => {
+    if (!chatId || !token) return;
+
+    // Check if token is expired
+    if (isTokenExpired(token)) {
+      console.log('Token expired, redirecting to login');
+      localStorage.clear();
+      window.location.href = '/login';
+      return;
+    }
+
+    // Close existing connection
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.close();
+    }
+
+    try {
+      setConnectionStatus('connecting');
+      const host = window.location.hostname;
+      const wsUrl = `ws://${host}:8000/ws/chat/${chatId}/?token=${token}`;
+      console.log(`Setting up WebSocket connection to: ${wsUrl}`);
+
+      ws.current = new WebSocket(wsUrl);
+
+      ws.current.onopen = () => {
+        console.log('WebSocket connected');
+        setConnectionStatus('connected');
+        wsRetryCount.current = 0;
+        onOpen?.();
+        onMessagesRead?.();
+      };
+
+      ws.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('WebSocket message received:', data);
+          onMessage?.(data);
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      ws.current.onclose = (e) => {
+        console.log('WebSocket closed:', e);
+        setConnectionStatus('disconnected');
+
+        // Reconnect on abnormal closure
+        if (e.code !== WS_CODES.NORMAL_CLOSURE) {
+          const timeout = Math.min(
+            WS_CODES.RECONNECT_BASE_MS * 2 ** wsRetryCount.current,
+            INTERVALS.WS_MAX_RECONNECT_DELAY_MS
+          );
+          wsRetryCount.current += 1;
+
+          console.log(`Reconnecting in ${timeout / 1000} seconds...`);
+          setTimeout(() => {
+            if (document.visibilityState === 'visible') {
+              setupWebSocketRef.current?.();
+            }
+          }, timeout);
+        }
+      };
+
+      ws.current.onerror = (e) => {
+        // Only log if WebSocket is not already closed (readyState 3)
+        // This avoids noisy errors during normal close sequences
+        if (ws.current?.readyState !== WebSocket.CLOSED) {
+          console.error('WebSocket error:', e);
+          setConnectionStatus('error');
+        }
+      };
+    } catch (error) {
+      console.error('WebSocket setup error:', error);
+      setConnectionStatus('error');
+    }
+  }, [chatId, token, isTokenExpired, onMessage, onMessagesRead, onOpen]);
+
+  // Store setup function in ref for reconnection
+  setupWebSocketRef.current = setupWebSocket;
+
+  // Send a message through WebSocket
+  const sendMessage = useCallback((message) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify(message));
+      return true;
+    }
+    console.error('WebSocket is not connected');
+    setConnectionStatus('error');
+    return false;
+  }, []);
+
+  // Close WebSocket connection
+  const close = useCallback((reason = 'Manual close') => {
+    if (ws.current) {
+      ws.current.close(WS_CODES.NORMAL_CLOSURE, reason);
+    }
+  }, []);
+
+  // Reconnect WebSocket
+  const reconnect = useCallback(() => {
+    setupWebSocketRef.current?.();
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (ws.current) {
+        ws.current.close(WS_CODES.NORMAL_CLOSURE, 'Component unmounted');
+      }
+    };
+  }, []);
+
+  return {
+    connectionStatus,
+    sendMessage,
+    close,
+    reconnect,
+    setupWebSocket,
+    isConnected: connectionStatus === 'connected',
+  };
+}
+
+export default useChatWebSocket;

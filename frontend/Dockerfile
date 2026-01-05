@@ -1,8 +1,25 @@
-# Use nginx directly with local build
+# Build stage
+FROM node:18-alpine AS build
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Build the React app
+RUN npm run build
+
+# Production stage
 FROM nginx:alpine
 
-# Copy the local build directory
-COPY build /usr/share/nginx/html
+# Copy the build from the build stage
+COPY --from=build /app/build /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf

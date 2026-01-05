@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from '../utils/axiosConfig';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { useAuth } from '../hooks/useAuth';
 
-function Profile({ logout, username }) {
+function Profile() {
+  const { token, userId, logout, username } = useAuth();
   const [profile, setProfile] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,12 +13,10 @@ function Profile({ logout, username }) {
   const [imageFile, setImageFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
-  const token = localStorage.getItem('token');
-  const userId = localStorage.getItem('userId');
   const { userId: profileUserId } = useParams();
   
   // Determine if we're viewing our own profile or someone else's
-  const isOwnProfile = !profileUserId || profileUserId === userId;
+  const isOwnProfile = !profileUserId || profileUserId === String(userId);
   const targetUserId = isOwnProfile ? userId : profileUserId;
 
   useEffect(() => {

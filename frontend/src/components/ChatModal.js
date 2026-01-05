@@ -11,8 +11,10 @@ import SwapanzaModal from "./SwapanzaModal";
 import { redirectToLogin } from '../utils/tokenUtils';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'react-toastify';
+import { useAuth } from '../hooks/useAuth';
 
 function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSwapanzaInvite }) {
+  const { token, userId: currentUserId, username } = useAuth();
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -21,11 +23,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const ws = useRef(null);
   const messagesEndRef = useRef(null);
-  const [currentUserId, setCurrentUserId] = useState(
-    Number(localStorage.getItem("userId") || 0)
-  );
   const wsRetryCount = useRef(0);
-  const token = localStorage.getItem("token");
 
  
   const [swapanzaPartner, setSwapanzaPartner] = useState(null);
@@ -199,8 +197,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     if (hasPendingSwapanzaInvite) {
       const fetchSwapanzaInvite = async () => {
         try {
-          const token = localStorage.getItem('token');
-          const currentUserId = Number(localStorage.getItem('userId'));
           const response = await axios.get(`/api/chats/${chatId}/`, {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -213,7 +209,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
             setSwapanzaRequestedBy(chat.swapanza_requested_by);
             // Set username based on whether current user is requester
             if (isCurrentUserRequester) {
-              setSwapanzaRequestedByUsername(localStorage.getItem("username") || "You");
+              setSwapanzaRequestedByUsername(username || "You");
             } else {
               const requester = chat.participants.find(p => Number(p.id) === Number(chat.swapanza_requested_by));
               setSwapanzaRequestedByUsername(requester?.username || "Unknown");
@@ -234,7 +230,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     } else {
       setPendingSwapanzaInvite(false);
     }
-  }, [hasPendingSwapanzaInvite, chatId]);
+  }, [hasPendingSwapanzaInvite, chatId, token, currentUserId, username]);
 
   const otherParticipant = useMemo(() => {
     if (!chat || !chat.participants || !currentUserId) return null;
@@ -817,7 +813,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
             setShowSwapanzaModal(false);
           } else {
             // For the requester, set their own username
-            setSwapanzaRequestedByUsername(localStorage.getItem("username") || "You");
+            setSwapanzaRequestedByUsername(username || "You");
             setShowSwapanzaModal(false);
           }        // Check if current user has already confirmed
         const confirmedUsers = chatResponse.data.swapanza_confirmed_users || [];
@@ -867,9 +863,8 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         setSwapanzaStartTime(new Date(chatResponse.data.swapanza_started_at));
 
         // Get message count for current user
-        const userId = localStorage.getItem("userId");
         const messageCount =
-          chatResponse.data.swapanza_message_count?.[userId] || 0;
+          chatResponse.data.swapanza_message_count?.[currentUserId] || 0;
         setRemainingMessages(2 - messageCount);
 
         // Find the other participant to set as swapanzaPartner
@@ -916,27 +911,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
       }
     };
   }, [chatId]);
-
-  useEffect(() => {
-    if (chat && chat.participants) {
-      const currentUsername = localStorage.getItem("username");
-
-      if (currentUsername) {
-        const currentUser = chat.participants.find(
-          (p) => p.username === currentUsername
-        );
-
-        if (currentUser) {
-          console.log("Found current user in participants:", currentUser);
-          setCurrentUserId(Number(currentUser.id));
-        } else {
-          console.warn("Current username not found in chat participants");
-        }
-      } else {
-        console.warn("No username found in localStorage");
-      }
-    }
-  }, [chat]);
 
   useEffect(() => {
     if (fetchChatRef.current) {
@@ -1060,7 +1034,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         setShowSwapanzaOptions(false);
         setIsSwapanzaRequested(true);
         setSwapanzaRequestedBy(currentUserId); // Use user ID, not 'you'
-        setSwapanzaRequestedByUsername(localStorage.getItem("username") || "You");
+        setSwapanzaRequestedByUsername(username || "You");
       }
     } catch (error) {
       console.error("Error checking if user can start Swapanza:", error);

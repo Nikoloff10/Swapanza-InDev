@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import RegistrationForm from './components/RegistrationForm';
 import ChatList from './components/ChatList';
 import Profile from './components/Profile';
 import Home from './components/Home';
-import { setupTokenExpirationChecker, validateToken } from './utils/tokenUtils';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import './utils/axiosConfig';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -21,7 +22,9 @@ function ScrollToTop() {
   return null;
 }
 
-function Navigation({ isAuth, username, logout }) {
+function Navigation() {
+  const { isAuth, username, logout } = useAuth();
+  
   if (!isAuth) return null;
   
   return (
@@ -51,42 +54,11 @@ function Navigation({ isAuth, username, logout }) {
   );
 }
 
-function App() {
-  const [isAuth, setIsAuth] = useState(false);
-  const [username, setUsername] = useState(localStorage.getItem('username') || '');
-  const [tokenChecked, setTokenChecked] = useState(false);
-
-  const login = (token, username, userId) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('username', username);
-    localStorage.setItem('userId', userId);
-    setIsAuth(true);
-    setUsername(username);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('userId');
-    setIsAuth(false);
-    setUsername('');
-  };
-
-  useEffect(() => {
-    // Validate token on initial load
-    const isTokenValid = validateToken();
-    setIsAuth(isTokenValid && !!localStorage.getItem('token'));
-    setUsername(localStorage.getItem('username') || '');
-    setTokenChecked(true);
-    
-    // Set up periodic token checking
-    const cleanup = setupTokenExpirationChecker(30000); // Check every 30 seconds
-    
-    return () => cleanup();
-  }, []);
+function AppContent() {
+  const { isAuth, isLoading } = useAuth();
 
   // Don't render until initial token check is complete
-  if (!tokenChecked) {
+  if (isLoading) {
     return (
       <div className="flex-center min-h-screen bg-gradient-to-br from-green-50 to-green-100">
         <div className="text-center">
@@ -117,35 +89,15 @@ function App() {
       />
       <Router>
         <ScrollToTop />
-        <header className="App-header">
-          <div className="container">
-            <div className="flex-between">
-              <Link to="/" className="text-decoration-none flex items-center space-x-3">
-                <img src="/logo.png" alt="Swapanza logo" width={40} height={40} style={{borderRadius: '8px'}} />
-                <h1>Swapanza</h1>
-              </Link>
-              {!isAuth && (
-                <div className="flex items-center space-x-4">
-                  <Link to="/login" className="btn-secondary">
-                    Login
-                  </Link>
-                  <Link to="/register" className="btn-primary">
-                    Get Started
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-        
-        <Navigation isAuth={isAuth} username={username} logout={logout} />
+        <Header />
+        <Navigation />
         
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route
               path="/login"
-              element={isAuth ? <Navigate to="/chats" replace /> : <LoginForm login={login} />}
+              element={isAuth ? <Navigate to="/chats" replace /> : <LoginForm />}
             />
             <Route
               path="/register"
@@ -153,21 +105,56 @@ function App() {
             />
             <Route
               path="/chats"
-              element={isAuth ? <ChatList logout={logout} username={username} /> : <Navigate to="/login" replace />}
+              element={isAuth ? <ChatList /> : <Navigate to="/login" replace />}
             />
            <Route 
               path="/profile" 
-              element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />} 
+              element={isAuth ? <Profile /> : <Navigate to="/login" replace />} 
             />
             <Route 
               path="/profile/:userId" 
-              element={isAuth ? <Profile logout={logout} username={username} /> : <Navigate to="/login" replace />} 
+              element={isAuth ? <Profile /> : <Navigate to="/login" replace />} 
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </Router>
     </div>
+  );
+}
+
+function Header() {
+  const { isAuth } = useAuth();
+  
+  return (
+    <header className="App-header">
+      <div className="container">
+        <div className="flex-between">
+          <Link to="/" className="text-decoration-none flex items-center space-x-3">
+            <img src="/logo.png" alt="Swapanza logo" width={40} height={40} style={{borderRadius: '8px'}} />
+            <h1>Swapanza</h1>
+          </Link>
+          {!isAuth && (
+            <div className="flex items-center space-x-4">
+              <Link to="/login" className="btn-secondary">
+                Login
+              </Link>
+              <Link to="/register" className="btn-primary">
+                Get Started
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

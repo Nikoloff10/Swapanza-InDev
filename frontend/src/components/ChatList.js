@@ -4,12 +4,12 @@ import ChatModal from "./ChatModal";
 import { useNavigate } from "react-router-dom";
 import { FaBell, FaUser, FaSearch, FaTimes, FaPlus } from "react-icons/fa";
 import { toast } from 'react-toastify';
+import { useAuth } from '../hooks/useAuth';
 
-function ChatList({ logout, username }) {
+function ChatList() {
+  const { token, userId: currentUserId, logout, username } = useAuth();
   const [wsConnected, setWsConnected] = useState(false);
   const notificationWsRef = useRef(null);
-  const token = localStorage.getItem("token");
-  const currentUserId = Number(localStorage.getItem("userId") || 0);
   const [chats, setChats] = useState([]);
   // Persist locally-closed chat ids so they don't reappear from the server/ws
   const [closedChatIds, setClosedChatIds] = useState(() => {

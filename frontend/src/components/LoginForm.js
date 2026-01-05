@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from '../utils/axiosConfig';
 import { toast } from 'react-toastify';
+import { useAuth } from '../hooks/useAuth';
 
-function LoginForm({ login }) {
+function LoginForm() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,10 +31,6 @@ function LoginForm({ login }) {
       });
 
       const userId = profileResponse.data.id; 
-      localStorage.setItem('token', token);
-      localStorage.setItem('username', username);
-      localStorage.setItem('userId', userId.toString());
-      console.log("LoginForm: userId set to localStorage:", userId);
       login(token, username, userId);
 
       toast.success(`Welcome back, ${username}!`);

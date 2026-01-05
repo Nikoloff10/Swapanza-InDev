@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import axios from "../utils/axiosConfig";
-import ChatModal from "./ChatModal";
-import { useNavigate } from "react-router-dom";
-import { FaBell, FaUser, FaSearch, FaTimes, FaPlus } from "react-icons/fa";
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import axios from '../utils/axiosConfig';
+import ChatModal from './ChatModal';
+import { useNavigate } from 'react-router-dom';
+import { FaBell, FaUser, FaSearch, FaTimes, FaPlus } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 import { INTERVALS, WS_CODES } from '../constants';
@@ -15,13 +15,15 @@ function ChatList() {
   // Persist locally-closed chat ids so they don't reappear from the server/ws
   const [closedChatIds, setClosedChatIds] = useState(() => {
     try {
-      return (JSON.parse(localStorage.getItem("closedChats") || "[]") || []).map((id) => id.toString());
+      return (JSON.parse(localStorage.getItem('closedChats') || '[]') || []).map((id) =>
+        id.toString()
+      );
     } catch (e) {
       console.error('Error reading closedChats from localStorage', e);
       return [];
     }
   });
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [modalChatId, setModalChatId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,9 +34,9 @@ function ChatList() {
   const searchTimeoutRef = useRef(null);
   const navigate = useNavigate();
   const wsErrorShownRef = useRef(false);
-  
+
   const handleProfileClick = () => {
-    navigate("/profile");
+    navigate('/profile');
   };
 
   const fetchCurrentUserProfile = useCallback(async () => {
@@ -47,8 +49,8 @@ function ChatList() {
 
       setCurrentUserProfile(response.data);
     } catch (error) {
-      console.error("Error fetching user profile:", error);
-      toast.error("Error fetching user profile");
+      console.error('Error fetching user profile:', error);
+      toast.error('Error fetching user profile');
     }
   }, [token, currentUserId]);
 
@@ -60,14 +62,14 @@ function ChatList() {
   // Helper to return and persist closed chat IDs
   const persistClosedChatIds = useCallback((ids) => {
     const unique = Array.from(new Set((ids || []).map((i) => i.toString())));
-    localStorage.setItem("closedChats", JSON.stringify(unique));
+    localStorage.setItem('closedChats', JSON.stringify(unique));
     setClosedChatIds(unique);
   }, []);
 
   // Read closed chat ids directly from localStorage for immediate consistency
   const getClosedChatIds = useCallback(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem("closedChats") || "[]");
+      const stored = JSON.parse(localStorage.getItem('closedChats') || '[]');
       return (stored || []).map((id) => id.toString());
     } catch (e) {
       return closedChatIds;
@@ -78,16 +80,16 @@ function ChatList() {
   const fetchUnreadCounts = useCallback(async () => {
     if (!token) return;
     try {
-      console.log("Fetching unread counts...");
-      const response = await axios.get("/api/unread-counts/", {
+      console.log('Fetching unread counts...');
+      const response = await axios.get('/api/unread-counts/', {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log("Unread counts received:", response.data);
+      console.log('Unread counts received:', response.data);
 
       // Filter out notifications for locally closed chats
       const closed = getClosedChatIds();
-      console.log("Closed chat IDs:", closed);
+      console.log('Closed chat IDs:', closed);
 
       const filteredCounts = {};
       Object.entries(response.data).forEach(([chatId, count]) => {
@@ -96,10 +98,10 @@ function ChatList() {
         }
       });
 
-      console.log("Filtered unread counts:", filteredCounts);
+      console.log('Filtered unread counts:', filteredCounts);
       setUnreadCounts(filteredCounts);
     } catch (error) {
-      console.error("Error fetching unread counts:", error.response || error);
+      console.error('Error fetching unread counts:', error.response || error);
     }
   }, [token, getClosedChatIds]);
 
@@ -113,15 +115,12 @@ function ChatList() {
       }
 
       try {
-        console.log("Searching for users with query:", query);
-        const response = await axios.get(
-          `/api/users/?search=${encodeURIComponent(query)}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        console.log('Searching for users with query:', query);
+        const response = await axios.get(`/api/users/?search=${encodeURIComponent(query)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-        console.log("Search results:", response.data);
+        console.log('Search results:', response.data);
 
         // Filter out the current user from results
         const filteredResults = response.data.filter(
@@ -130,8 +129,8 @@ function ChatList() {
 
         setSearchResults(filteredResults);
       } catch (error) {
-        console.error("Error searching users:", error);
-        toast.error("Error searching users");
+        console.error('Error searching users:', error);
+        toast.error('Error searching users');
         setSearchResults([]);
       }
     },
@@ -144,45 +143,45 @@ function ChatList() {
   }, []);
 
   // enhanced open: sets pending invite flag and removes chat from closed ids if needed
-  const openModalEnhanced = useCallback((chatId) => {
-    setModalChatId(chatId);
-    setIsModalOpen(true);
+  const openModalEnhanced = useCallback(
+    (chatId) => {
+      setModalChatId(chatId);
+      setIsModalOpen(true);
 
-    // If this chat had a swapanza invite marker (-1) treat it as pending
-    const isInvite = unreadCounts[chatId] === -1;
-    setHasPendingSwapanzaInvite(!!isInvite);
+      // If this chat had a swapanza invite marker (-1) treat it as pending
+      const isInvite = unreadCounts[chatId] === -1;
+      setHasPendingSwapanzaInvite(!!isInvite);
 
-    // If the chat was locally closed, remove it from closed list so it will appear normally
-    const closed = getClosedChatIds();
-    if (closed.includes(chatId.toString())) {
-      const remaining = closed.filter((id) => id !== chatId.toString());
-      persistClosedChatIds(remaining);
-    }
-  }, [unreadCounts, getClosedChatIds, persistClosedChatIds]);
+      // If the chat was locally closed, remove it from closed list so it will appear normally
+      const closed = getClosedChatIds();
+      if (closed.includes(chatId.toString())) {
+        const remaining = closed.filter((id) => id !== chatId.toString());
+        persistClosedChatIds(remaining);
+      }
+    },
+    [unreadCounts, getClosedChatIds, persistClosedChatIds]
+  );
 
   // Create a chat with a user
   const createChat = useCallback(
     async (otherUserId) => {
       try {
-        console.log("Attempting to create chat with user ID:", otherUserId);
+        console.log('Attempting to create chat with user ID:', otherUserId);
 
         // Check for existing chat with this user, including closed ones
         let existingChat = null;
 
         // First check visible chats
         existingChat = chats.find((chat) =>
-          chat.participants.some(
-            (participant) => Number(participant.id) === Number(otherUserId)
-          )
+          chat.participants.some((participant) => Number(participant.id) === Number(otherUserId))
         );
 
         // If not found in visible chats, check on the server
         if (!existingChat) {
           try {
-            const response = await axios.get(
-              `/api/chats/find-by-user/${otherUserId}/`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const response = await axios.get(`/api/chats/find-by-user/${otherUserId}/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
 
             if (response.data && response.data.id) {
               existingChat = response.data;
@@ -193,10 +192,7 @@ function ChatList() {
                 const updatedClosedChats = closedChatIds.filter(
                   (id) => id !== existingChat.id.toString()
                 );
-                localStorage.setItem(
-                  "closedChats",
-                  JSON.stringify(updatedClosedChats)
-                );
+                localStorage.setItem('closedChats', JSON.stringify(updatedClosedChats));
               }
 
               // Add to visible chats if not already there
@@ -205,18 +201,15 @@ function ChatList() {
               }
             }
           } catch (error) {
-            console.log("No existing chat found on server:", error);
+            console.log('No existing chat found on server:', error);
           }
         }
 
         if (existingChat) {
-          console.log(
-            "Chat already exists, opening existing chat:",
-            existingChat.id
-          );
+          console.log('Chat already exists, opening existing chat:', existingChat.id);
 
           // Clear search
-          setSearchQuery("");
+          setSearchQuery('');
           setSearchResults([]);
 
           // Open the existing chat
@@ -224,30 +217,30 @@ function ChatList() {
           return;
         }
 
-        console.log("No existing chat found, creating new chat");
+        console.log('No existing chat found, creating new chat');
         // If no existing chat, create a new one
         const response = await axios.post(
-          "/api/chats/",
+          '/api/chats/',
           { participants: [otherUserId] },
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log("New chat created:", response.data);
+        console.log('New chat created:', response.data);
 
         // Add the new chat to the list and open it
         setChats((prevChats) => [...prevChats, response.data]);
 
         // Clear search
-        setSearchQuery("");
+        setSearchQuery('');
         setSearchResults([]);
 
         // Open the chat modal
-  openModalEnhanced(response.data.id);
+        openModalEnhanced(response.data.id);
       } catch (error) {
-        console.error("Error creating chat:", error);
+        console.error('Error creating chat:', error);
       }
     },
-  [token, chats, openModalEnhanced, getClosedChatIds]
+    [token, chats, openModalEnhanced, getClosedChatIds]
   );
 
   // Handle search input with debounce
@@ -278,10 +271,10 @@ function ChatList() {
         headers: { Authorization: `Bearer ${token}` },
         params: { include_closed: true },
       });
-  // filter out chats user closed locally
-  const closed = getClosedChatIds();
-  const filtered = (response.data || []).filter((c) => !closed.includes(c.id.toString()));
-  setChats(filtered);
+      // filter out chats user closed locally
+      const closed = getClosedChatIds();
+      const filtered = (response.data || []).filter((c) => !closed.includes(c.id.toString()));
+      setChats(filtered);
     } catch (error) {
       console.error('Error fetching chats:', error);
       toast.error('Error fetching chats');
@@ -313,13 +306,13 @@ function ChatList() {
 
   // Handle when messages are read
   const handleMessagesRead = useCallback(() => {
-    console.log("Messages read callback triggered");
+    console.log('Messages read callback triggered');
     // Refresh unread counts when messages are marked as read
     fetchUnreadCounts();
   }, [fetchUnreadCounts]);
 
   const handleNewMessage = useCallback(() => {
-    console.log("New message callback triggered");
+    console.log('New message callback triggered');
     // Refresh unread counts when a new message arrives
     fetchUnreadCounts();
   }, [fetchUnreadCounts]);
@@ -342,7 +335,7 @@ function ChatList() {
         return newCounts;
       });
     },
-  [getClosedChatIds, persistClosedChatIds]
+    [getClosedChatIds, persistClosedChatIds]
   );
 
   // Close all chats
@@ -356,16 +349,16 @@ function ChatList() {
     setChats([]);
     setUnreadCounts({});
 
-  // Refresh immediately; fetchChats reads localStorage so new closed IDs are used
-  fetchChats();
-  fetchUnreadCounts();
+    // Refresh immediately; fetchChats reads localStorage so new closed IDs are used
+    fetchChats();
+    fetchUnreadCounts();
   }, [chats, getClosedChatIds, fetchChats, fetchUnreadCounts, persistClosedChatIds]);
 
   // Reset all notifications
   const resetAllNotifications = useCallback(async () => {
     try {
       await axios.post(
-        "/api/reset-notifications/",
+        '/api/reset-notifications/',
         {},
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -378,12 +371,13 @@ function ChatList() {
       // Refresh the counts from server
       fetchUnreadCounts();
     } catch (error) {
-      console.error("Error resetting notifications:", error);
+      console.error('Error resetting notifications:', error);
     }
   }, [token, fetchUnreadCounts]);
 
   // Calculate total unread messages
-  const totalUnreadMessages = Object.values(unreadCounts).reduce((sum, count) => sum + (count > 0 ? count : 0), 0) || 0;
+  const totalUnreadMessages =
+    Object.values(unreadCounts).reduce((sum, count) => sum + (count > 0 ? count : 0), 0) || 0;
 
   // WebSocket connection with exponential backoff and proper cleanup
   useEffect(() => {
@@ -413,13 +407,13 @@ function ChatList() {
 
     const startPing = () => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      
+
       if (pingInterval) clearInterval(pingInterval);
       if (pongTimeout) clearTimeout(pongTimeout);
 
       // Send initial ping
       ws.send(JSON.stringify({ type: 'ping' }));
-      
+
       pingInterval = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'ping' }));
@@ -506,12 +500,12 @@ function ChatList() {
 
             // Handle notifications
             if (data.type === 'unread_count') {
-              setUnreadCounts(prev => ({ ...prev, [data.chat_id]: data.count }));
+              setUnreadCounts((prev) => ({ ...prev, [data.chat_id]: data.count }));
             } else if (data.type === 'swapanza_invite') {
-              setUnreadCounts(prev => ({ ...prev, [data.chat_id]: -1 }));
+              setUnreadCounts((prev) => ({ ...prev, [data.chat_id]: -1 }));
               toast.info(`Swapanza invite from ${data.from}! Click to view.`, {
                 onClick: () => openModalEnhanced(Number(data.chat_id)),
-                autoClose: 6000
+                autoClose: 6000,
               });
             }
           } catch (err) {
@@ -563,11 +557,11 @@ function ChatList() {
                     />
                   ) : (
                     <span className="text-xl font-bold">
-                      {username ? username[0].toUpperCase() : "?"}
+                      {username ? username[0].toUpperCase() : '?'}
                     </span>
                   )}
                 </div>
-                
+
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">Chats</h1>
                   <p className="text-gray-600 text-sm">Welcome back, {username}!</p>
@@ -612,10 +606,8 @@ function ChatList() {
                       <div className="max-h-80 overflow-y-auto">
                         {Object.keys(unreadCounts).length > 0 ? (
                           Object.entries(unreadCounts).map(([chatId, count]) => {
-                            const chat = chats.find(
-                              (c) => c.id.toString() === chatId
-                            );
-                            
+                            const chat = chats.find((c) => c.id.toString() === chatId);
+
                             let otherUser = chat?.participants?.find(
                               (p) => Number(p.id) !== Number(currentUserId)
                             );
@@ -634,17 +626,19 @@ function ChatList() {
                                 <div className="flex justify-between items-center">
                                   <div className="flex items-center space-x-3">
                                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-sm font-bold">
-                                      {otherUser?.username?.[0]?.toUpperCase() || "?"}
+                                      {otherUser?.username?.[0]?.toUpperCase() || '?'}
                                     </div>
                                     <span className="font-medium text-gray-900">
-                                      {otherUser?.username || "Unknown"}
+                                      {otherUser?.username || 'Unknown'}
                                     </span>
                                   </div>
-                                  <span className={`${
-                                    isSwapanzaInvite 
-                                      ? 'bg-purple-100 text-purple-800' 
-                                      : 'bg-green-100 text-green-800'
-                                  } text-xs font-medium px-3 py-1 rounded-full`}>
+                                  <span
+                                    className={`${
+                                      isSwapanzaInvite
+                                        ? 'bg-purple-100 text-purple-800'
+                                        : 'bg-green-100 text-green-800'
+                                    } text-xs font-medium px-3 py-1 rounded-full`}
+                                  >
                                     {isSwapanzaInvite ? 'Swapanza' : `${count} new`}
                                   </span>
                                 </div>
@@ -664,10 +658,7 @@ function ChatList() {
                 </div>
 
                 {/* Logout Button */}
-                <button
-                  onClick={logout}
-                  className="btn-danger"
-                >
+                <button onClick={logout} className="btn-danger">
                   🚪 Logout
                 </button>
               </div>
@@ -687,14 +678,14 @@ function ChatList() {
               />
               {searchQuery && (
                 <button
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => setSearchQuery('')}
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   <FaTimes className="w-4 h-4" />
                 </button>
               )}
             </div>
-            
+
             {/* Search Results */}
             {searchResults.length > 0 && (
               <div className="mt-4 space-y-2">
@@ -720,10 +711,7 @@ function ChatList() {
           {/* Actions */}
           {chats.length > 0 && (
             <div className="mb-6">
-              <button
-                onClick={closeAllChats}
-                className="w-full btn-secondary"
-              >
+              <button onClick={closeAllChats} className="w-full btn-secondary">
                 Close All Chats
               </button>
             </div>
@@ -736,7 +724,7 @@ function ChatList() {
                 const otherUser = chat.participants.find(
                   (p) => Number(p.id) !== Number(currentUserId)
                 );
-                const chatName = otherUser ? otherUser.username : "Unknown User";
+                const chatName = otherUser ? otherUser.username : 'Unknown User';
                 const unreadCount = unreadCounts[chat.id] || 0;
 
                 return (
@@ -755,7 +743,7 @@ function ChatList() {
                           <p className="text-sm text-gray-500">Click to open chat</p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         {unreadCount > 0 && (
                           <span className="bg-red-500 text-white text-sm rounded-full h-6 w-6 flex items-center justify-center font-bold">
@@ -780,7 +768,9 @@ function ChatList() {
             ) : (
               <div className="card text-center py-12">
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No chats yet</h3>
-                <p className="text-gray-600 mb-4">Search for users above to start your first conversation!</p>
+                <p className="text-gray-600 mb-4">
+                  Search for users above to start your first conversation!
+                </p>
               </div>
             )}
           </div>

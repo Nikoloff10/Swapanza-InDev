@@ -13,15 +13,15 @@ function SwapanzaModal({
 }) {
   const [timeLeft, setTimeLeft] = useState(SWAPANZA.INVITE_TIMEOUT_SECONDS);
   const timerRef = useRef(null);
-  
+
   useEffect(() => {
     if (isOpen) {
       // Reset timer when modal opens
       setTimeLeft(SWAPANZA.INVITE_TIMEOUT_SECONDS);
-      
+
       // Start countdown
       timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
+        setTimeLeft((prev) => {
           const newValue = prev - 1;
           if (newValue <= 0) {
             clearInterval(timerRef.current);
@@ -32,16 +32,16 @@ function SwapanzaModal({
         });
       }, INTERVALS.COUNTDOWN_TICK_MS);
     }
-    
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
   }, [isOpen, onClose]);
-  
+
   if (!isOpen) return null;
-  
+
   return (
     <div className="modal-overlay">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -51,10 +51,14 @@ function SwapanzaModal({
             <h2 className="text-2xl font-bold mb-2">Swapanza Invitation</h2>
             <p className="text-purple-100">
               {requestedBy === 'you' ? (
-                <>You&apos;ve sent a Swapanza invitation for <span className="font-semibold">{duration} minutes</span></>
+                <>
+                  You&apos;ve sent a Swapanza invitation for{' '}
+                  <span className="font-semibold">{duration} minutes</span>
+                </>
               ) : (
                 <>
-                  <span className="font-semibold">{requestedByUsername}</span> has invited you to swap profiles!
+                  <span className="font-semibold">{requestedByUsername}</span> has invited you to
+                  swap profiles!
                 </>
               )}
             </p>
@@ -88,15 +92,15 @@ function SwapanzaModal({
               onClick={onConfirm}
               disabled={userConfirmed}
               className={`w-full p-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 ${
-                userConfirmed 
-                  ? 'bg-green-500 text-white cursor-not-allowed' 
+                userConfirmed
+                  ? 'bg-green-500 text-white cursor-not-allowed'
                   : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-lg transform hover:-translate-y-0.5'
               }`}
             >
               <FaCheck className="w-4 h-4" />
               <span>{userConfirmed ? 'Confirmed!' : 'Confirm Participation'}</span>
             </button>
-            
+
             <button
               onClick={onClose}
               className="w-full p-4 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-all duration-200 flex items-center justify-center space-x-2"

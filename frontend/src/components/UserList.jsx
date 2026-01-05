@@ -50,9 +50,10 @@ function UserList() {
       return;
     }
 
-    const filtered = users.filter(user =>
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
+    const filtered = users.filter(
+      (user) =>
+        user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
     setFilteredUsers(filtered);
   }, [searchQuery, users]);
@@ -98,24 +99,27 @@ function UserList() {
 
           {/* Users Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredUsers.map(user => (
-              <div key={user.id} className="card group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
+            {filteredUsers.map((user) => (
+              <div
+                key={user.id}
+                className="card group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2"
+              >
                 <div className="text-center">
                   {/* User Avatar */}
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-green-600 text-white flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-lg">
                     {user.username[0].toUpperCase()}
                   </div>
-                  
+
                   {/* User Info */}
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">{user.username}</h3>
-                  
+
                   {user.email && (
                     <div className="flex items-center justify-center text-gray-600 mb-4">
                       <FaEnvelope className="w-4 h-4 mr-2" />
                       <span className="text-sm">{user.email}</span>
                     </div>
                   )}
-                  
+
                   {/* Action Buttons */}
                   <div className="space-y-2">
                     <button className="btn-primary w-full">
@@ -141,10 +145,7 @@ function UserList() {
                 {searchQuery ? `No users match "${searchQuery}"` : 'No users available'}
               </p>
               {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="btn-primary"
-                >
+                <button onClick={() => setSearchQuery('')} className="btn-primary">
                   Clear Search
                 </button>
               )}

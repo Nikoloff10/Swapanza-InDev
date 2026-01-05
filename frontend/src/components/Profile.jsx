@@ -14,7 +14,7 @@ function Profile() {
   const [uploading, setUploading] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const { userId: profileUserId } = useParams();
-  
+
   // Determine if we're viewing our own profile or someone else's
   const isOwnProfile = !profileUserId || profileUserId === String(userId);
   const targetUserId = isOwnProfile ? userId : profileUserId;
@@ -27,12 +27,12 @@ function Profile() {
         });
         setProfile(response.data);
         setBio(response.data.bio || '');
-        
+
         // Save profile image URL to localStorage for use across the app
         if (response.data.profile_image_url && isOwnProfile) {
           localStorage.setItem('profileImageUrl', response.data.profile_image_url);
         }
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -58,13 +58,13 @@ function Profile() {
     try {
       const response = await axios.post(`/api/profile/${userId}/upload-image/`, formData, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
       });
-      
+
       // Save to localStorage for use across the app
       localStorage.setItem('profileImageUrl', response.data.profile_image_url);
-      
+
       setProfile({ ...profile, profile_image_url: response.data.profile_image_url });
       setImageFile(null);
       toast.success('Profile picture updated successfully! 🎉');
@@ -79,7 +79,7 @@ function Profile() {
   const handleUpdateBio = async () => {
     try {
       const response = await axios.put(
-        `/api/profile/${userId}/`,  
+        `/api/profile/${userId}/`,
         { bio },
         {
           headers: {
@@ -107,7 +107,7 @@ function Profile() {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="min-h-screen flex-center bg-gradient-to-br from-green-50 to-green-100">
@@ -157,15 +157,25 @@ function Profile() {
                     </div>
                   )}
                 </div>
-                
+
                 {isOwnProfile && (
                   <div className="absolute -bottom-2 -right-2">
                     <label className="cursor-pointer bg-green-400 hover:bg-green-500 text-white p-3 rounded-full shadow-lg transition-colors flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                        />
                       </svg>
                       <input
-                        type="file" 
+                        type="file"
                         accept="image/*"
                         onChange={handleImageChange}
                         className="hidden"
@@ -174,16 +184,14 @@ function Profile() {
                   </div>
                 )}
               </div>
-              
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">{profile.username || username}</h2>
-              
+
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                {profile.username || username}
+              </h2>
+
               {isOwnProfile && imageFile && (
                 <div className="mt-4">
-                  <button 
-                    onClick={handleImageUpload}
-                    disabled={uploading}
-                    className="btn-primary"
-                  >
+                  <button onClick={handleImageUpload} disabled={uploading} className="btn-primary">
                     {uploading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -196,7 +204,7 @@ function Profile() {
                 </div>
               )}
             </div>
-            
+
             {/* Bio Section */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
@@ -210,7 +218,7 @@ function Profile() {
                   </button>
                 )}
               </div>
-              
+
               {isOwnProfile && editingBio ? (
                 <div className="space-y-4">
                   <textarea
@@ -220,10 +228,7 @@ function Profile() {
                     placeholder="Tell us about yourself..."
                   ></textarea>
                   <div className="flex space-x-3">
-                    <button
-                      onClick={handleUpdateBio}
-                      className="btn-primary flex-1"
-                    >
+                    <button onClick={handleUpdateBio} className="btn-primary flex-1">
                       Save Bio
                     </button>
                     <button
@@ -240,23 +245,21 @@ function Profile() {
               ) : (
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-gray-700">
-                    {profile.bio || (isOwnProfile ? 'No bio yet. Click edit to add one!' : 'No bio available.')}
+                    {profile.bio ||
+                      (isOwnProfile ? 'No bio yet. Click edit to add one!' : 'No bio available.')}
                   </p>
                 </div>
               )}
             </div>
-            
+
             {/* Action Buttons */}
             <div className="space-y-3">
               <Link to="/chats" className="btn-primary w-full text-center">
                 Back to Chats
               </Link>
-              
+
               {isOwnProfile && (
-                <button
-                  onClick={logout}
-                  className="btn-danger w-full"
-                >
+                <button onClick={logout} className="btn-danger w-full">
                   Logout
                 </button>
               )}

@@ -75,7 +75,6 @@ function UserList() {
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="text-5xl mb-4">👥</div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">User Directory</h1>
             <p className="text-gray-600">Discover and connect with other Swapanza users</p>
           </div>
@@ -139,7 +138,6 @@ function UserList() {
           {/* Empty State */}
           {filteredUsers.length === 0 && (
             <div className="card text-center py-16">
-              <div className="text-6xl mb-4">🔍</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No users found</h3>
               <p className="text-gray-600 mb-4">
                 {searchQuery ? `No users match "${searchQuery}"` : 'No users available'}

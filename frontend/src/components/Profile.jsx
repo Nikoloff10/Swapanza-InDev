@@ -67,7 +67,7 @@ function Profile() {
 
       setProfile({ ...profile, profile_image_url: response.data.profile_image_url });
       setImageFile(null);
-      toast.success('Profile picture updated successfully! 🎉');
+      toast.success('Profile picture updated successfully!');
       setUploading(false);
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -112,7 +112,6 @@ function Profile() {
     return (
       <div className="min-h-screen flex-center bg-gradient-to-br from-green-50 to-green-100">
         <div className="card text-center">
-          <div className="text-5xl mb-4">❌</div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Profile</h2>
           <p className="text-gray-600 mb-4">{error.message}</p>
           <Link to="/chats" className="btn-primary">

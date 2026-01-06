@@ -142,13 +142,23 @@ export function useSwapanza({
       const startedAt = new Date(data.started_at);
       const endsAt = new Date(data.ends_at);
 
-      // Calculate duration from server times (avoids client/server clock drift)
-      const durationSeconds = Math.floor((endsAt - startedAt) / 1000);
+      // Calculate REMAINING time using server_time (handles rejoining mid-session)
+      // If server_time is provided, use it to calculate elapsed time
+      // Otherwise fall back to full duration (for new activations)
+      let remainingSeconds;
+      if (data.server_time) {
+        const serverNow = new Date(data.server_time);
+        remainingSeconds = Math.max(0, Math.floor((endsAt - serverNow) / 1000));
+      } else {
+        // Fallback: full duration (for backwards compatibility)
+        remainingSeconds = Math.floor((endsAt - startedAt) / 1000);
+      }
 
       console.log('Timer setup:', {
         rawStartedAt: data.started_at,
         rawEndsAt: data.ends_at,
-        durationSeconds,
+        serverTime: data.server_time,
+        remainingSeconds,
       });
 
       setSwapanzaStartTime(startedAt);
@@ -186,15 +196,15 @@ export function useSwapanza({
         }
       }
 
-      // Start countdown timer with server-calculated duration
-      setupSwapanzaTimer(durationSeconds);
+      // Start countdown timer with remaining time (handles mid-session rejoins)
+      setupSwapanzaTimer(remainingSeconds);
 
       // Store in localStorage
       localStorage.setItem(
         `swapanza_active_${chatId}`,
         JSON.stringify({
           active: true,
-          durationSeconds,
+          remainingSeconds,
           startedAtClient: Date.now(), // Track when client received activation
           remainingMessages: data.remaining_messages || SWAPANZA.MESSAGE_LIMIT,
         })
@@ -312,6 +322,8 @@ export function useSwapanza({
         params: { chat_id: chatId },
       });
 
+      console.log('[fetchGlobalSwapanzaState] API response:', response.data);
+
       if (response.data.active) {
         const startedAt = new Date(response.data.started_at);
         const endsAt = new Date(response.data.ends_at);
@@ -331,17 +343,27 @@ export function useSwapanza({
         });
 
         // Calculate remaining time from server timestamps (avoids clock drift)
-        const totalDurationSeconds = Math.floor((endsAt - startedAt) / 1000);
-        // Get server's current time from response header or estimate
         const serverNow = response.data.server_time
           ? new Date(response.data.server_time)
-          : startedAt; // Fallback: assume started just now
-        const elapsedSeconds = Math.floor((serverNow - startedAt) / 1000);
-        const remainingSeconds = Math.max(0, totalDurationSeconds - elapsedSeconds);
+          : new Date(); // Fallback: use client time
+        const remainingSeconds = Math.max(0, Math.floor((endsAt - serverNow) / 1000));
+
+        console.log('[fetchGlobalSwapanzaState] Timer calc:', {
+          serverTime: response.data.server_time,
+          serverNow: serverNow.toISOString(),
+          endsAt: endsAt.toISOString(),
+          remainingSeconds,
+          hasTimerRef: !!swapanzaTimeLeftRef.current,
+        });
 
         setTimeLeft(remainingSeconds);
 
         if (!swapanzaTimeLeftRef.current) {
+          console.log(
+            '[fetchGlobalSwapanzaState] Starting timer with',
+            remainingSeconds,
+            'seconds'
+          );
           setupSwapanzaTimer(remainingSeconds);
         }
       } else if (!chat?.swapanza_active && !pendingSwapanzaInvite && !isSwapanzaRequested) {

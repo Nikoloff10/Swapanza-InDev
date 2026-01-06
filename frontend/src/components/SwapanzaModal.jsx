@@ -114,7 +114,7 @@ function SwapanzaModal({
           {userConfirmed && (
             <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
               <p className="text-sm text-green-700 font-medium">
-                ✅ Waiting for the other user to confirm...
+                Waiting for the other user to confirm...
               </p>
             </div>
           )}
@@ -148,7 +148,7 @@ function SwapanzaModal({
           {/* Warning */}
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-xs text-yellow-800 text-center">
-              ⚠️ Messages will be permanently linked to your profile
+              Warning: Messages will be permanently linked to your profile
             </p>
           </div>
         </div>

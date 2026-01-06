@@ -358,7 +358,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center py-12">
-              <div className="text-5xl mb-4">❌</div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Chat</h2>
               <p className="text-gray-600 mb-4">{error}</p>
               <button onClick={onClose} className="btn-primary">
@@ -378,7 +377,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center py-12">
-              <div className="text-5xl mb-4">🔍</div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Chat Not Found</h2>
               <p className="text-gray-600 mb-4">The requested chat could not be found.</p>
               <button onClick={onClose} className="btn-primary">

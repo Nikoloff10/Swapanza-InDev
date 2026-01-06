@@ -64,6 +64,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 global_state['started_at'].isoformat(),
                 'ends_at':
                 global_state['ends_at'].isoformat(),
+                'server_time':
+                timezone.now().isoformat(),
                 'partner_id':
                 partner.id,
                 'partner_username':
@@ -194,14 +196,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     })
 
             elif message_type == 'swapanza.confirm':
-                print(f"📨 PROCESSING CONFIRMATION: Swapanza confirmation from {self.user.username} (ID: {self.user.id})")
+                print(f"PROCESSING CONFIRMATION: Swapanza confirmation from {self.user.username} (ID: {self.user.id})")
                 logger.info(f"Processing Swapanza confirmation from {self.user.username} (ID: {self.user.id})")
                 success, message, all_confirmed = await self.confirm_swapanza()
 
-                print(f"🔄 CONFIRMATION RESULT: success={success}, message='{message}', all_confirmed={all_confirmed}")
+                print(f"CONFIRMATION RESULT: success={success}, message='{message}', all_confirmed={all_confirmed}")
 
                 if not success:
-                    print(f"❌ CONFIRMATION FAILED: {message}")
+                    print(f"CONFIRMATION FAILED: {message}")
                     logger.error(f"Swapanza confirmation failed: {message}")
                     await self.send(text_data=json.dumps({
                         'type': 'error',
@@ -209,7 +211,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     }))
                     return
 
-                print(f"📡 SENDING GROUP MESSAGE: Broadcasting confirmation to chat group")
+                print(f"SENDING GROUP MESSAGE: Broadcasting confirmation to chat group")
                 await self.channel_layer.group_send(
                     self.chat_group_name, {
                         'type': 'swapanza_confirm',
@@ -220,7 +222,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
                 # If all confirmed, activate Swapanza
                 if all_confirmed:
-                    print(f"🎉 ALL CONFIRMED: All users confirmed for chat {self.chat_id}, activating Swapanza after 2 second delay")
+                    print(f"ALL CONFIRMED: All users confirmed for chat {self.chat_id}, activating Swapanza after 2 second delay")
                     logger.info(f"All users confirmed for chat {self.chat_id}, activating Swapanza after 2 second delay")
                     await asyncio.sleep(2)  # Brief delay for UI
                     success, message, data = await self.activate_swapanza()
@@ -232,6 +234,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                 'type': 'swapanza_activate',
                                 'started_at': data['started_at'].isoformat(),
                                 'ends_at': data['ends_at'].isoformat(),
+                                'server_time': timezone.now().isoformat(),
                                 'partner_id': data['partner_id'],
                                 'partner_username': data['partner_username'],
                                 'partner_profile_image': data.get('partner_profile_image')
@@ -517,6 +520,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 chat.swapanza_started_at.isoformat(),
                 'ends_at':
                 chat.swapanza_ends_at.isoformat(),
+                'server_time':
+                now.isoformat(),
                 'partner_id':
                 other_participant.id,
                 'partner_username':
@@ -573,6 +578,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     active_session.started_at.isoformat(),
                     'ends_at':
                     active_session.ends_at.isoformat(),
+                    'server_time':
+                    now.isoformat(),
                     'partner_id':
                     active_session.partner.id,
                     'partner_username':
@@ -641,7 +648,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             chat.swapanza_duration = duration
             # Initialize confirmed_users with the requester's ID (they're auto-confirmed)
             chat.swapanza_confirmed_users = [str(self.user.id)]  
-            print(f"🔧 PRE-SAVE DEBUG: Setting confirmed_users to [{str(self.user.id)}] for user {self.user.username} (ID: {self.user.id})")
+            print(f"PRE-SAVE DEBUG: Setting confirmed_users to [{str(self.user.id)}] for user {self.user.username} (ID: {self.user.id})")
             chat.swapanza_requested_at = timezone.now()  
             chat.save(update_fields=[
                 'swapanza_requested_by', 'swapanza_duration',
@@ -649,8 +656,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             ])
             # Verify the save actually worked
             chat.refresh_from_db()
-            print(f"🔍 POST-SAVE CHECK: Database now shows confirmed_users={chat.swapanza_confirmed_users}")
-            print(f"✅ SWAPANZA REQUEST SAVED: Chat {self.chat_id} now has request by {chat.swapanza_requested_by.username} at {chat.swapanza_requested_at} with confirmed_users={chat.swapanza_confirmed_users}")
+            print(f"POST-SAVE CHECK: Database now shows confirmed_users={chat.swapanza_confirmed_users}")
+            print(f"SWAPANZA REQUEST SAVED: Chat {self.chat_id} now has request by {chat.swapanza_requested_by.username} at {chat.swapanza_requested_at} with confirmed_users={chat.swapanza_confirmed_users}")
 
             return True, None
         except Exception as e:
@@ -666,32 +673,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
             chat = Chat.objects.get(id=self.chat_id)
             
             # Debug logging
-            print(f"🔍 CONFIRM SWAPANZA CALLED: User {self.user.username} (ID: {self.user.id}) attempting to confirm in chat {self.chat_id}")
-            print(f"🔍 CHAT STATE: requested_by={chat.swapanza_requested_by}, requested_at={chat.swapanza_requested_at}, confirmed_users={chat.swapanza_confirmed_users}")
+            print(f"CONFIRM SWAPANZA CALLED: User {self.user.username} (ID: {self.user.id}) attempting to confirm in chat {self.chat_id}")
+            print(f"CHAT STATE: requested_by={chat.swapanza_requested_by}, requested_at={chat.swapanza_requested_at}, confirmed_users={chat.swapanza_confirmed_users}")
             logger.info(f"User {self.user.username} (ID: {self.user.id}) attempting to confirm Swapanza in chat {self.chat_id}")
 
             # Check if there's an active invitation to confirm
             if not chat.swapanza_requested_by:
-                print(f"❌ NO ACTIVE INVITATION: Chat {self.chat_id} has no swapanza_requested_by")
+                print(f"NO ACTIVE INVITATION: Chat {self.chat_id} has no swapanza_requested_by")
                 logger.warning(f"No active Swapanza invitation found in chat {self.chat_id}")
                 return False, "No active Swapanza invitation found", False
 
             logger.info(f"Active Swapanza request by {chat.swapanza_requested_by.username} found")
 
-            print(f"🔍 BEFORE CONFIRMED USERS: About to get confirmed users list")
+            print(f"BEFORE CONFIRMED USERS: About to get confirmed users list")
             # Get current confirmed users
             try:
                 confirmed_users = chat.swapanza_confirmed_users or []
-                print(f"📝 CONFIRMED USERS: Current confirmed users: {confirmed_users}")
+                print(f"CONFIRMED USERS: Current confirmed users: {confirmed_users}")
             except Exception as e:
-                print(f"❌ ERROR GETTING CONFIRMED USERS: {str(e)}")
+                print(f"ERROR GETTING CONFIRMED USERS: {str(e)}")
                 logger.error(f"Error getting confirmed users: {str(e)}")
                 return False, f"Error getting confirmed users: {str(e)}", False
             logger.info(f"Current confirmed users: {confirmed_users}")
 
             # Check if already confirmed
             if str(self.user.id) in confirmed_users:
-                print(f"✅ ALREADY CONFIRMED: User {self.user.username} already confirmed")
+                print(f"ALREADY CONFIRMED: User {self.user.username} already confirmed")
                 logger.info(f"User {self.user.username} already confirmed")
                 return True, "Already confirmed", False
 
@@ -700,7 +707,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             chat.swapanza_confirmed_users = confirmed_users
             chat.save(update_fields=['swapanza_confirmed_users'])
             
-            print(f"💾 SAVED CONFIRMATION: Updated confirmed users: {confirmed_users}")
+            print(f"SAVED CONFIRMATION: Updated confirmed users: {confirmed_users}")
             logger.info(f"Updated confirmed users: {confirmed_users}")
 
             # Check if all participants confirmed
@@ -708,8 +715,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             participant_ids = [str(p.id) for p in participants]
             all_confirmed = len(confirmed_users) == len(participants)
             
-            print(f"👥 PARTICIPANTS: {[p.username for p in participants]} (IDs: {participant_ids})")
-            print(f"🎯 ALL CONFIRMED CHECK: {all_confirmed} ({len(confirmed_users)}/{len(participants)})")
+            print(f"PARTICIPANTS: {[p.username for p in participants]} (IDs: {participant_ids})")
+            print(f"ALL CONFIRMED CHECK: {all_confirmed} ({len(confirmed_users)}/{len(participants)})")
             logger.info(f"Participants: {[p.username for p in participants]} (IDs: {participant_ids})")
             logger.info(f"All confirmed: {all_confirmed} ({len(confirmed_users)}/{len(participants)})")
 
@@ -887,6 +894,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'type': 'swapanza.activate',
                 'started_at': event['started_at'],
                 'ends_at': event['ends_at'],
+                'server_time': event.get('server_time', timezone.now().isoformat()),
                 'partner_id': event['partner_id'],
                 'partner_username': event['partner_username'],
                 'partner_profile_image': event.get('partner_profile_image'),
@@ -920,24 +928,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def swapanza_logout(self, event):
         """Send Swapanza logout notification to WebSocket"""
-        
-        if self.scope['session'].get('already_logging_out'):
-            
+        # Use instance attribute instead of session to track logout state
+        if getattr(self, '_already_logging_out', False):
             return
 
-        
-        self.scope['session']['already_logging_out'] = True
+        self._already_logging_out = True
 
-        
-        await self.send(text_data=json.dumps({
-            'type': 'swapanza.logout',
-            'force_redirect':
-            True  
-        }))
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'swapanza.logout',
+                'force_redirect': True
+            }))
+        except Exception as e:
+            logger.error(f"Error sending swapanza.logout: {e}")
 
-        
-        await self.close(code=4000
-                         )  
+        # Close the WebSocket connection
+        await self.close(code=4000)
 
     @database_sync_to_async
     def deactivate_swapanza_sessions(self):
@@ -1275,6 +1281,13 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def notify(self, event):
         await self.send(text_data=json.dumps(event['data']))
+
+    async def swapanza_logout(self, event):
+        """Handle swapanza_logout message - forward to client"""
+        await self.send(text_data=json.dumps({
+            'type': 'swapanza.logout',
+            'force_redirect': event.get('force_redirect', True)
+        }))
 
     @database_sync_to_async
     def get_user_from_token(self):

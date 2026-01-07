@@ -1,6 +1,6 @@
 import logging
 import os
-from django.db.models import Q
+from django.db.models import Q, Count, Prefetch
 from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError
@@ -196,7 +196,9 @@ class ChatListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Chat.objects.filter(participants=self.request.user)
+        return Chat.objects.filter(
+            participants=self.request.user
+        ).prefetch_related('participants').select_related('swapanza_requested_by')
 
     def perform_create(self, serializer):
         participants = self.request.data.get('participants', [])
@@ -207,19 +209,19 @@ class ChatListCreateView(generics.ListCreateAPIView):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def unread_message_counts(request):
-    """Get counts of unread messages for all chats"""
+    """Get counts of unread messages for all chats - optimized single query"""
     user = request.user
-    chats = Chat.objects.filter(participants=user)
-
-    unread_counts = {}
-    for chat in chats:
-        
-        count = Message.objects.filter(chat=chat).exclude(
-            read_by=user  
-        ).exclude(sender=user).count()
-
-        if count > 0:
-            unread_counts[str(chat.id)] = count
+    
+    chats_with_counts = Chat.objects.filter(
+        participants=user
+    ).annotate(
+        unread_count=Count(
+            'messages',
+            filter=~Q(messages__sender=user) & ~Q(messages__read_by=user)
+        )
+    ).filter(unread_count__gt=0).values('id', 'unread_count')
+    
+    unread_counts = {str(chat['id']): chat['unread_count'] for chat in chats_with_counts}
 
     logger.info(f"Unread counts for user {user.username}: {unread_counts}")
     return Response(unread_counts)
@@ -320,8 +322,10 @@ class MessageListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         chat_id = self.kwargs['chat_id']
-        return Message.objects.filter(chat_id=chat_id,
-                                      chat__participants=self.request.user)
+        return Message.objects.filter(
+            chat_id=chat_id,
+            chat__participants=self.request.user
+        ).select_related('sender', 'apparent_sender')
 
     def create(self, request, *args, **kwargs):
         chat_id = self.kwargs['chat_id']
@@ -349,22 +353,21 @@ class MessageListCreateView(generics.ListCreateAPIView):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def reset_notifications(request):
-    """Reset all unread messages for the user"""
+    """Reset all unread messages for the user - optimized bulk operation"""
     user = request.user
 
+    unread_messages = Message.objects.filter(
+        chat__participants=user
+    ).exclude(read_by=user).exclude(sender=user)
     
-    chats = Chat.objects.filter(participants=user)
-
+    total_updated = unread_messages.count()
     
-    total_updated = 0
-    for chat in chats:
-        unread_messages = Message.objects.filter(chat=chat).exclude(
-            read_by=user  
-        ).exclude(sender=user)
-
-        for message in unread_messages:
-            message.read_by.add(user)
-            total_updated += 1
+    ReadBy = Message.read_by.through
+    read_by_records = [
+        ReadBy(message_id=msg_id, user_id=user.id)
+        for msg_id in unread_messages.values_list('id', flat=True)
+    ]
+    ReadBy.objects.bulk_create(read_by_records, ignore_conflicts=True)
 
     return Response({"message": f"Reset {total_updated} notifications"},
                     status=status.HTTP_200_OK)
@@ -576,50 +579,37 @@ class ChatListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        
         user = self.request.user
-        queryset = Chat.objects.filter(participants=user).order_by('-id')
-
-        
-        include_closed = self.request.query_params.get(
-            'include_closed', 'false').lower() == 'true'
-
-        if not include_closed:
-            
-            pass
-
-        return queryset
+        return Chat.objects.filter(
+            participants=user
+        ).prefetch_related('participants').select_related('swapanza_requested_by').order_by('-id')
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         data = serializer.data
 
-        
         now = timezone.now()
+        chat_lookup = {chat.id: chat for chat in queryset}
 
         for chat_data in data:
-            chat = Chat.objects.get(id=chat_data['id'])
+            chat = chat_lookup[chat_data['id']]
 
-            
             if chat.swapanza_requested_by:
-                chat_data[
-                    'swapanza_requested_by'] = chat.swapanza_requested_by.id
+                chat_data['swapanza_requested_by'] = chat.swapanza_requested_by.id
                 chat_data['swapanza_duration'] = chat.swapanza_duration
                 chat_data['swapanza_confirmed_users'] = chat.swapanza_confirmed_users or []
                 if chat.swapanza_requested_at:
-                    chat_data[
-                        'swapanza_requested_at'] = chat.swapanza_requested_at.isoformat(
-                        )
+                    chat_data['swapanza_requested_at'] = chat.swapanza_requested_at.isoformat()
 
-            
-            chat_data['swapanza_active'] = (chat.swapanza_active
-                                            and chat.swapanza_ends_at
-                                            and chat.swapanza_ends_at > now)
+            chat_data['swapanza_active'] = (
+                chat.swapanza_active
+                and chat.swapanza_ends_at
+                and chat.swapanza_ends_at > now
+            )
 
             if chat_data['swapanza_active']:
-                chat_data[
-                    'swapanza_ends_at'] = chat.swapanza_ends_at.isoformat()
+                chat_data['swapanza_ends_at'] = chat.swapanza_ends_at.isoformat()
                 chat_data['swapanza_message_count'] = chat.swapanza_message_count or {}
 
         return Response(data)

@@ -74,7 +74,7 @@ class ChatSerializer(serializers.ModelSerializer):
         return [user.username for user in obj.participants.all()]
 
     def get_swapanza_requested_by(self, obj):
-        return obj.swapanza_requested_by.id if obj.swapanza_requested_by else None
+        return obj.swapanza_requested_by_id
 
     def get_swapanza_requested_by_username(self, obj):
         return obj.swapanza_requested_by.username if obj.swapanza_requested_by else None

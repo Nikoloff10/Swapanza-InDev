@@ -2,25 +2,31 @@ import { useState, useCallback, useRef } from 'react';
 import axios from '../utils/axiosConfig';
 
 /**
- * Custom hook to manage chat messages
- * Handles fetching, sending, and message state
+ * Custom hook to manage chat messages with pagination
+ * Handles fetching, pagination, sending, and message state
  */
 export function useChatMessages({ chatId, token, currentUserId }) {
   const [messages, setMessages] = useState([]);
   const [chat, setChat] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextCursor, setNextCursor] = useState(null);
 
   const pendingMessages = useRef([]);
 
-  // Fetch chat and messages from API
+  // Fetch chat metadata and initial messages
   const fetchChat = useCallback(async () => {
     if (!chatId || !token) return null;
 
     try {
       setLoading(true);
-      const [chatResponse, swapanzaResponse] = await Promise.all([
+      const [chatResponse, messagesResponse, swapanzaResponse] = await Promise.all([
         axios.get(`/api/chats/${chatId}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`/api/chats/${chatId}/messages/`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get('/api/active-swapanza/', {
@@ -29,7 +35,15 @@ export function useChatMessages({ chatId, token, currentUserId }) {
       ]);
 
       setChat(chatResponse.data);
-      setMessages(chatResponse.data.messages || []);
+
+      // Messages come newest-first from API, reverse for chronological display
+      const fetchedMessages = messagesResponse.data.results || messagesResponse.data || [];
+      setMessages(fetchedMessages.slice().reverse());
+
+      // Handle pagination cursors
+      setNextCursor(messagesResponse.data.next || null);
+      setHasMore(!!messagesResponse.data.next);
+
       setLoading(false);
 
       return {
@@ -43,6 +57,30 @@ export function useChatMessages({ chatId, token, currentUserId }) {
       return null;
     }
   }, [chatId, token]);
+
+  // Load older messages (pagination)
+  const loadMoreMessages = useCallback(async () => {
+    if (!nextCursor || loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const response = await axios.get(nextCursor, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const olderMessages = response.data.results || response.data || [];
+
+      // Prepend older messages (reverse since API returns newest-first)
+      setMessages((prev) => [...olderMessages.slice().reverse(), ...prev]);
+
+      setNextCursor(response.data.next || null);
+      setHasMore(!!response.data.next);
+    } catch (err) {
+      console.error('Error loading more messages:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore, hasMore, token]);
 
   // Handle incoming chat message from WebSocket
   const handleChatMessage = useCallback((message) => {
@@ -110,8 +148,11 @@ export function useChatMessages({ chatId, token, currentUserId }) {
     messages,
     setMessages,
     loading,
+    loadingMore,
     error,
+    hasMore,
     fetchChat,
+    loadMoreMessages,
     handleChatMessage,
     handleMessageError,
     getOtherParticipant,

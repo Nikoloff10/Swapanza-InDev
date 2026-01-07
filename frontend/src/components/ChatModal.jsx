@@ -31,8 +31,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
     messages,
     setMessages,
     loading,
+    loadingMore,
     error,
+    hasMore,
     fetchChat,
+    loadMoreMessages,
     handleChatMessage,
     handleMessageError,
     clearPendingMessages,
@@ -220,6 +223,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
           partner_id: swapanzaData.partner_id,
           partner_username: swapanzaData.partner_username,
           partner_profile_image: swapanzaData.partner_profile_image,
+          server_time: swapanzaData.server_time,
         });
       }
     },
@@ -430,6 +434,18 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          {/* Load More Button */}
+          {hasMore && messages.length > 0 && (
+            <div className="text-center mb-4">
+              <button
+                onClick={loadMoreMessages}
+                disabled={loadingMore}
+                className="px-4 py-2 text-sm text-purple-600 hover:text-purple-800 disabled:text-gray-400"
+              >
+                {loadingMore ? 'Loading...' : 'Load older messages'}
+              </button>
+            </div>
+          )}
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 my-8">
               <p>No messages yet</p>

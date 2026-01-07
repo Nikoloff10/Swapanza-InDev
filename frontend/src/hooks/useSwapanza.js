@@ -42,6 +42,12 @@ export function useSwapanza({
 
   // Timer ref
   const swapanzaTimeLeftRef = useRef(null);
+  const timeLeftRef = useRef(null);
+
+  // Keep timeLeftRef in sync with timeLeft state
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
 
   // Reset all Swapanza state
   const resetSwapanza = useCallback(() => {
@@ -166,12 +172,8 @@ export function useSwapanza({
       setIsSwapanzaActive(true);
       setIsSwapanzaRequested(false);
 
-      // Set remaining messages
-      if (data.remaining_messages !== undefined && data.remaining_messages !== null) {
-        setRemainingMessages(Math.max(data.remaining_messages, 0));
-      } else {
-        setRemainingMessages(SWAPANZA.MESSAGE_LIMIT);
-      }
+      // Set to full limit - fetchGlobalSwapanzaState will correct with chat_specific_count
+      setRemainingMessages(SWAPANZA.MESSAGE_LIMIT);
 
       // Clear confirmation state
       setUserConfirmedSwapanza(false);
@@ -332,7 +334,10 @@ export function useSwapanza({
         setSwapanzaEndTime(endsAt);
         setSwapanzaStartTime(startedAt);
 
-        if (response.data.remaining_messages !== undefined) {
+        // Use chat_specific_count for current chat, fall back to remaining_messages
+        if (response.data.chat_specific_count !== undefined) {
+          setRemainingMessages(SWAPANZA.MESSAGE_LIMIT - response.data.chat_specific_count);
+        } else if (response.data.remaining_messages !== undefined) {
           setRemainingMessages(response.data.remaining_messages);
         }
 
@@ -354,11 +359,17 @@ export function useSwapanza({
           endsAt: endsAt.toISOString(),
           remainingSeconds,
           hasTimerRef: !!swapanzaTimeLeftRef.current,
+          currentTimeLeft: timeLeftRef.current,
         });
 
-        setTimeLeft(remainingSeconds);
-
-        if (!swapanzaTimeLeftRef.current) {
+        // Correct timer drift if difference > 3 seconds (use ref to avoid dependency loop)
+        if (swapanzaTimeLeftRef.current && timeLeftRef.current !== null) {
+          const drift = Math.abs(timeLeftRef.current - remainingSeconds);
+          if (drift > 3) {
+            console.log(`[fetchGlobalSwapanzaState] Correcting drift of ${drift}s`);
+            setupSwapanzaTimer(remainingSeconds);
+          }
+        } else if (!swapanzaTimeLeftRef.current) {
           console.log(
             '[fetchGlobalSwapanzaState] Starting timer with',
             remainingSeconds,
@@ -366,6 +377,8 @@ export function useSwapanza({
           );
           setupSwapanzaTimer(remainingSeconds);
         }
+
+        setTimeLeft(remainingSeconds);
       } else if (!chat?.swapanza_active && !pendingSwapanzaInvite && !isSwapanzaRequested) {
         resetSwapanza();
       }

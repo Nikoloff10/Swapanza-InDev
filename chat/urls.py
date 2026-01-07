@@ -17,6 +17,7 @@ urlpatterns = [
     path('unread-counts/', views.unread_message_counts, name='unread-counts'),
     path('reset-notifications/', views.reset_notifications, name='reset-notifications'),
     path('chats/find-by-user/<int:user_id>/', views.find_chat_by_user, name='find-chat-by-user'),
+    path('chats/<int:chat_id>/messages/', views.MessageListCreateView.as_view(), name='chat-messages'),
 
     path('active-swapanza/', views.get_active_swapanza, name='active-swapanza'),
     path('can-start-swapanza/', views.can_start_swapanza, name='can-start-swapanza'),

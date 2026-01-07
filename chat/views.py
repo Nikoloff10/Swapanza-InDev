@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 import cloudinary.uploader
 from swapanzaBackend import settings
 from .models import Chat, Message, SwapanzaSession
-from .serializers import ChatSerializer, MessageSerializer, UserSerializer
+from .serializers import ChatSerializer, ChatSerializerLight, MessageSerializer, UserSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.response import Response
@@ -316,16 +316,23 @@ class ChatDetailView(generics.RetrieveUpdateAPIView):
 logger = logging.getLogger(__name__)
 
 
+class MessageCursorPagination(pagination.CursorPagination):
+    page_size = 30
+    ordering = '-created_at'
+    cursor_query_param = 'cursor'
+
+
 class MessageListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = MessageSerializer
+    pagination_class = MessageCursorPagination
 
     def get_queryset(self):
         chat_id = self.kwargs['chat_id']
         return Message.objects.filter(
             chat_id=chat_id,
             chat__participants=self.request.user
-        ).select_related('sender', 'apparent_sender')
+        ).select_related('sender', 'apparent_sender').order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
         chat_id = self.kwargs['chat_id']

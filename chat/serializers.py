@@ -51,7 +51,37 @@ class MessageSerializer(serializers.ModelSerializer):
         sender = validated_data.pop('sender', None)
         return Message.objects.create(chat=chat, sender=sender, **validated_data)
 
+class ChatSerializerLight(serializers.ModelSerializer):
+    """Chat serializer without messages - for list views and initial load"""
+    participants = UserSerializer(many=True, read_only=True)
+    participants_usernames = serializers.SerializerMethodField()
+    swapanza_requested_by = serializers.SerializerMethodField()
+    swapanza_requested_by_username = serializers.SerializerMethodField()
+    swapanza_duration = serializers.IntegerField(read_only=True)
+    swapanza_requested_at = serializers.DateTimeField(read_only=True)
+    swapanza_confirmed_users = serializers.ListField(read_only=True)
+
+    class Meta:
+        model = Chat
+        fields = [
+            'id', 'participants', 'participants_usernames', 'created_at',
+            'swapanza_requested_by', 'swapanza_requested_by_username', 'swapanza_duration',
+            'swapanza_requested_at', 'swapanza_confirmed_users'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_participants_usernames(self, obj):
+        return [user.username for user in obj.participants.all()]
+
+    def get_swapanza_requested_by(self, obj):
+        return obj.swapanza_requested_by_id
+
+    def get_swapanza_requested_by_username(self, obj):
+        return obj.swapanza_requested_by.username if obj.swapanza_requested_by else None
+
+
 class ChatSerializer(serializers.ModelSerializer):
+    """Full chat serializer with messages - for backwards compatibility"""
     participants = UserSerializer(many=True, read_only=True)
     messages = MessageSerializer(many=True, read_only=True)
     participants_usernames = serializers.SerializerMethodField()

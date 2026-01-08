@@ -19,7 +19,6 @@ function UserList() {
       setUsers(response.data);
       setFilteredUsers(response.data);
     } catch (error) {
-      console.error(error);
       setError('Failed to fetch users');
       toast.error('Failed to fetch users');
     } finally {
@@ -31,10 +30,7 @@ function UserList() {
     try {
       const response = await axios.post('/api/chats/', { user: userId });
       toast.success('Chat started!');
-      // Redirect to the chat room or update the chat list
-      console.log('Chat started:', response.data);
     } catch (error) {
-      console.error(error);
       toast.error('Failed to start chat');
     }
   };

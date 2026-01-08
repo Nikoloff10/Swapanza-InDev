@@ -85,7 +85,6 @@ export function useChatMessages({ chatId, token, currentUserId }) {
   // Handle incoming chat message from WebSocket
   const handleChatMessage = useCallback((message) => {
     if (!message || (!message.id && !message.content)) {
-      console.error('Invalid message format:', message);
       return;
     }
 

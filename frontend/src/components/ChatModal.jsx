@@ -58,7 +58,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
   // Handle Swapanza logout - defined early since it's used in handleWsMessage
   const handleSwapanzaLogout = useCallback(() => {
-    console.log('Received Swapanza logout notification - forcing logout');
     localStorage.clear();
     toast.info('Your Swapanza session has expired. You will be redirected to login.');
     redirectToLogin();
@@ -89,7 +88,6 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
           break;
         }
         case 'chat.messages_read':
-          console.log('Messages marked as read by user:', data.user_id);
           onMessagesRead?.();
           break;
         case 'chat.message.error':

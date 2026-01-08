@@ -259,8 +259,6 @@ export function useChatListData() {
           autoClose: 6000,
         });
       } else if (data.type === 'swapanza.logout') {
-        // Force logout when Swapanza expires - applies to all users in the session
-        console.log('Swapanza expired - logging out');
         localStorage.clear();
         toast.info('Your Swapanza session has expired. You will be redirected to login.');
         window.location.href = '/login';

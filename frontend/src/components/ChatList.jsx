@@ -96,7 +96,7 @@ function ChatList() {
               addChat(existingChat);
             }
           } catch (error) {
-            console.log('No existing chat found on server:', error);
+            // Chat doesn't exist on server yet
           }
         }
 

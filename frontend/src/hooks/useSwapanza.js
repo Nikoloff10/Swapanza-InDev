@@ -120,7 +120,6 @@ export function useSwapanza({
   // Handle Swapanza confirmation from WebSocket
   const handleSwapanzaConfirm = useCallback(
     (data) => {
-      console.log('Processing Swapanza confirmation:', data);
       const isCurrentUser = Number(data.user_id) === Number(currentUserId);
 
       if (isCurrentUser) {
@@ -142,7 +141,6 @@ export function useSwapanza({
   // Handle Swapanza activation from WebSocket
   const handleSwapanzaActivate = useCallback(
     (data) => {
-      console.log('Swapanza activated:', data);
       setShowSwapanzaModal(false);
 
       const startedAt = new Date(data.started_at);
@@ -159,13 +157,6 @@ export function useSwapanza({
         // Fallback: full duration (for backwards compatibility)
         remainingSeconds = Math.floor((endsAt - startedAt) / 1000);
       }
-
-      console.log('Timer setup:', {
-        rawStartedAt: data.started_at,
-        rawEndsAt: data.ends_at,
-        serverTime: data.server_time,
-        remainingSeconds,
-      });
 
       setSwapanzaStartTime(startedAt);
       setSwapanzaEndTime(endsAt);
@@ -259,7 +250,6 @@ export function useSwapanza({
 
       return { success: false, message: 'Could not send Swapanza request' };
     } catch (error) {
-      console.error('Error requesting Swapanza:', error);
       return {
         success: false,
         message: error.response?.data?.error || 'Could not verify if you can start a Swapanza',
@@ -270,7 +260,6 @@ export function useSwapanza({
 
   // Confirm Swapanza participation
   const confirmSwapanza = useCallback(() => {
-    console.log('Sending Swapanza confirmation');
     const sent = sendWsMessageRef?.current?.({ type: 'swapanza.confirm' });
     if (sent) {
       setUserConfirmedSwapanza(true);
@@ -324,8 +313,6 @@ export function useSwapanza({
         params: { chat_id: chatId },
       });
 
-      console.log('[fetchGlobalSwapanzaState] API response:', response.data);
-
       if (response.data.active) {
         const startedAt = new Date(response.data.started_at);
         const endsAt = new Date(response.data.ends_at);
@@ -334,7 +321,6 @@ export function useSwapanza({
         setSwapanzaEndTime(endsAt);
         setSwapanzaStartTime(startedAt);
 
-        // Use chat_specific_count for current chat, fall back to remaining_messages
         if (response.data.chat_specific_count !== undefined) {
           setRemainingMessages(SWAPANZA.MESSAGE_LIMIT - response.data.chat_specific_count);
         } else if (response.data.remaining_messages !== undefined) {
@@ -347,34 +333,17 @@ export function useSwapanza({
           profile_image: response.data.partner_profile_image,
         });
 
-        // Calculate remaining time from server timestamps (avoids clock drift)
         const serverNow = response.data.server_time
           ? new Date(response.data.server_time)
-          : new Date(); // Fallback: use client time
+          : new Date();
         const remainingSeconds = Math.max(0, Math.floor((endsAt - serverNow) / 1000));
 
-        console.log('[fetchGlobalSwapanzaState] Timer calc:', {
-          serverTime: response.data.server_time,
-          serverNow: serverNow.toISOString(),
-          endsAt: endsAt.toISOString(),
-          remainingSeconds,
-          hasTimerRef: !!swapanzaTimeLeftRef.current,
-          currentTimeLeft: timeLeftRef.current,
-        });
-
-        // Correct timer drift if difference > 3 seconds (use ref to avoid dependency loop)
         if (swapanzaTimeLeftRef.current && timeLeftRef.current !== null) {
           const drift = Math.abs(timeLeftRef.current - remainingSeconds);
           if (drift > 3) {
-            console.log(`[fetchGlobalSwapanzaState] Correcting drift of ${drift}s`);
             setupSwapanzaTimer(remainingSeconds);
           }
         } else if (!swapanzaTimeLeftRef.current) {
-          console.log(
-            '[fetchGlobalSwapanzaState] Starting timer with',
-            remainingSeconds,
-            'seconds'
-          );
           setupSwapanzaTimer(remainingSeconds);
         }
 
@@ -383,7 +352,7 @@ export function useSwapanza({
         resetSwapanza();
       }
     } catch (error) {
-      console.error('Error checking global Swapanza state:', error);
+      // Failed to fetch Swapanza state
     }
   }, [
     token,

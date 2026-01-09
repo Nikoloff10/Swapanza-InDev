@@ -118,6 +118,7 @@ frontend/build/
 
 # Any additional environment files
 .envrc
+todo.txt
 
 # Explicitly ignore .env file at root
 /.env

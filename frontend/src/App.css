@@ -1,4 +1,6 @@
 .App {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   background: linear-gradient(135deg, #f7fef9 0%, #edfdf2 100%);
 }
@@ -27,8 +29,8 @@
 }
 
 .main-content {
-  padding: 2rem 0;
-  min-height: calc(100vh - 80px);
+  padding: 2rem 0 0;
+  flex: 1 1 auto;
 }
 
 .section-title {

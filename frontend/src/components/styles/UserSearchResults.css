@@ -1,0 +1,19 @@
+/* UserSearchResults styles */
+.user-search-results { margin-top: 0.75rem; }
+.user-search-results > * + * { margin-top: 0.5rem; }
+
+.user-search-item {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0.75rem;
+  background:#f8fafb;
+  border-radius:0.5rem;
+  border:1px solid #f3f4f6;
+  cursor:pointer;
+  transition:background 150ms ease;
+}
+.user-search-item:hover { background:#f0fdf4; }
+.user-search-item-left { display:flex; align-items:center; gap:0.75rem; }
+.user-search-username { font-weight:600; color:#111827; }
+.user-search-plus { color:var(--primary-600); width:1rem; height:1rem; }

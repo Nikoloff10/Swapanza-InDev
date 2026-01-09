@@ -3,6 +3,7 @@ import axios from '../utils/axiosConfig';
 import { toast } from 'react-toastify';
 import { FaUsers, FaUser, FaEnvelope, FaSearch, FaTimes } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
+import './styles/UserList.css';
 
 function UserList() {
   const [users, setUsers] = useState([]);
@@ -56,7 +57,7 @@ function UserList() {
 
   if (loading && users.length === 0) {
     return (
-      <div className="min-h-screen flex-center bg-gradient-to-br from-green-50 to-green-100">
+      <div className="page-bg flex-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
           <p className="text-green-700 font-medium">Loading users...</p>
@@ -66,7 +67,7 @@ function UserList() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 py-12">
+    <div className="page-bg py-12">
       <div className="container">
         <div className="max-w-4xl mx-auto">
           {/* Header */}

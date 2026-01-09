@@ -1,0 +1,23 @@
+/* Notifications dropdown styles */
+.notifications-dropdown { position: relative; display:inline-block; }
+.notif-toggle { padding:0.6rem; background: var(--primary-100); border-radius:9999px; border:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition: background 150ms ease; position:relative; }
+.notif-toggle:hover { background: var(--primary-200); }
+.notif-icon { color: var(--primary-600); width: 1rem; height: 1rem; display:block; }
+.notif-badge { position:absolute; top:-6px; right:-6px; background:#ef4444; color:white; font-weight:700; width:1.25rem; height:1.25rem; border-radius:9999px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; }
+.notif-panel { position:absolute; right:0; margin-top:0.75rem; width:20rem; background:white; border-radius:1rem; box-shadow:var(--shadow-xl); border:1px solid #f3f4f6; z-index:20; overflow:hidden; }
+.notif-panel-header { padding: 1rem; border-bottom:1px solid #f3f4f6; font-weight:600; display:flex; align-items:center; justify-content:space-between; }
+.notif-panel-title { color:#111827; }
+.notif-clear-btn { background:transparent; border:none; color:var(--primary-600); cursor:pointer; font-size:0.875rem; font-weight:600; }
+.notif-clear-btn:hover { color:var(--primary-700); }
+.notif-list { max-height:20rem; overflow-y:auto; }
+.notif-item { padding:1rem; border-bottom:1px solid #f3f4f6; cursor:pointer; transition: background 150ms ease; }
+.notif-item:hover { background:#f9fafb; }
+.notif-item-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
+.notif-item-left { display:flex; align-items:center; gap:0.75rem; }
+.notif-username { font-weight:600; color:#111827; }
+.notif-pill { font-size:0.75rem; font-weight:600; padding:0.25rem 0.5rem; border-radius:9999px; display:inline-block; }
+.notif-pill--swapanza { background: linear-gradient(90deg,#f3e8ff,#ede9fe); color:#6d28d9; border:1px solid #efe6ff; }
+.notif-pill--count { background: linear-gradient(90deg,#d1fae5,#bbf7d0); color:#065f46; border:1px solid #bbf7d0; }
+.notif-empty { padding:2rem; text-align:center; color:#6b7280; }
+.notif-empty-title { font-weight:600; margin-bottom:0.25rem; }
+.notif-empty-sub { font-size:0.875rem; }

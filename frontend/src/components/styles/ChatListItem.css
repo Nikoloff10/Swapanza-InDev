@@ -1,0 +1,22 @@
+/* Chat list item specific styles */
+.chat-item-close {
+  padding: 0.5rem;
+  background: transparent; /* no border / background by default */
+  color: #ef4444; /* red */
+  border: none;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 120ms ease, transform 100ms ease, color 120ms ease;
+}
+.chat-item-close:hover {
+  background: rgba(239,68,68,0.08); /* subtle red halo on hover */
+  color: #dc2626;
+  transform: translateY(-1px);
+}
+.chat-item-close:focus {
+  outline: 3px solid rgba(239,68,68,0.12);
+  outline-offset: 2px;
+}

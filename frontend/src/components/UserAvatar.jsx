@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import './styles/UserAvatar.css';
 
 /**
  * UserAvatar - Reusable avatar component
@@ -15,17 +16,34 @@ function UserAvatar({
   gradientTo = 'to-green-600',
 }) {
   const sizeClasses = {
-    sm: 'w-8 h-8 text-sm',
-    md: 'w-12 h-12 text-lg',
-    lg: 'w-16 h-16 text-xl',
+    sm: 'user-avatar--sm',
+    md: 'user-avatar--md',
+    lg: 'user-avatar--lg',
   };
 
-  const baseClasses = `rounded-full bg-gradient-to-br ${gradientFrom} ${gradientTo} text-white flex items-center justify-center font-bold overflow-hidden`;
-  const interactiveClasses = onClick ? 'cursor-pointer ring-2 ring-white shadow-lg' : '';
+  const interactiveClasses = onClick ? 'user-avatar--clickable' : '';
+
+  // Map some common gradient tokens to CSS color variables
+  const gradientMap = {
+    'from-green-400': 'var(--primary-400)',
+    'to-green-600': 'var(--primary-600)',
+    'from-green-300': 'var(--primary-300)',
+    'to-green-500': 'var(--primary-500)',
+    'from-purple-400': 'var(--accent-purple)',
+    'to-purple-600': 'var(--accent-purple)',
+    'from-yellow-50': 'rgba(255,249,231,1)',
+    'to-yellow-100': 'rgba(254,243,199,1)',
+  };
+
+  const colorFrom = gradientMap[gradientFrom] || 'var(--primary-400)';
+  const colorTo = gradientMap[gradientTo] || 'var(--primary-600)';
+
+  const style = { background: `linear-gradient(135deg, ${colorFrom}, ${colorTo})` };
 
   return (
     <div
-      className={`${baseClasses} ${sizeClasses[size]} ${interactiveClasses} ${className}`}
+      className={`user-avatar ${sizeClasses[size]} ${interactiveClasses} ${className}`}
+      style={style}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}

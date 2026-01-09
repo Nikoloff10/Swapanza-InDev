@@ -1,0 +1,21 @@
+/* UserAvatar component styles */
+.user-avatar {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  font-weight:700;
+  overflow:hidden;
+  border-radius:9999px;
+  box-shadow: var(--shadow-md);
+}
+.user-avatar--sm { width:2rem; height:2rem; font-size:0.875rem; }
+.user-avatar--md { width:3rem; height:3rem; font-size:1rem; }
+.user-avatar--lg { width:4rem; height:4rem; font-size:1.25rem; }
+.user-avatar--clickable { cursor:pointer; border: 2px solid rgba(255,255,255,0.85); }
+.user-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+.user-avatar span { display:block; }
+
+/* Avatar background helpers */
+.avatar-bg-green { background: linear-gradient(135deg,#34d399,#10b981); }
+.avatar-bg-purple { background: linear-gradient(135deg,#8b5cf6,#7c3aed); }

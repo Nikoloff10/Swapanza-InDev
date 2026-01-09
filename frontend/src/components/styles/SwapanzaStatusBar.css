@@ -1,0 +1,9 @@
+/* Swapanza status styles */
+.swapanza-active { border-top: 1px solid #ede9fe; padding: 1rem; background: linear-gradient(90deg,#faf5ff,#f3e8ff); }
+.swapanza-pending { border-top: 1px solid #fef3c7; padding: 1rem; background: linear-gradient(90deg,#fffbeb,#ffedd5); }
+.status-pill { display:inline-block; padding:0.25rem 0.75rem; border-radius:9999px; font-weight:600; }
+.status-pill--purple { background:#faf5ff; color:#6d28d9; border:1px solid #e9d5ff; }
+.status-pill--yellow { background:#fff7ed; color:#92400e; border:1px solid #ffedd5; }
+.status-indicator { margin-top:0.5rem; display:inline-block; padding:0.25rem 0.5rem; border-radius:0.5rem; font-size:0.875rem; }
+.status-indicator--green { background:#ecfdf5; color:#065f46; border:1px solid #bbf7d0; }
+.status-indicator--blue { background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; }

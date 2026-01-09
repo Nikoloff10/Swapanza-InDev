@@ -1,0 +1,4 @@
+/* Swapanza options modal (specific overrides) */
+@import './Modal.css';
+.modal-subtitle { margin-bottom: 0.75rem; }
+.modal-footer { display:flex; gap:0.75rem; }

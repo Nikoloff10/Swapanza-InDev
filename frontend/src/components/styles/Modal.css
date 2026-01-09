@@ -1,0 +1,14 @@
+/* Shared modal utilities */
+.modal-content { background: white; border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); max-width: 40rem; width: 100%; margin: 0 1rem; }
+.modal-md { max-width: 35.2rem; width: 100%; min-height: 38vh; overflow-y: auto; max-height: 108vh; padding: 1.5rem; box-sizing: border-box; }
+.modal-md > .p-6 { padding: 0; }
+@media (max-width: 640px) { .modal-md { height: auto; max-height: 90vh; padding: 0 0.5rem; } }
+.modal-header-gradient { background: linear-gradient(90deg,#7c3aed,#6d28d9); color: #fff; padding: 1.25rem; text-align: center; }
+.modal-title-large { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.5rem; }
+.modal-subtitle { font-size: 1.125rem; font-weight: 600; color: #111827; margin-bottom: 0.5rem; }
+.modal-text { color: #6b7280; margin-bottom: 1rem; }
+.modal-footer { display:flex; gap:0.75rem; }
+.info-box--purple { background: #f5f3ff; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.25rem; text-align:center; color: #6d28d9; }
+.btn-confirm { display:flex; align-items:center; justify-content:center; gap:0.5rem; padding:1rem; border-radius:0.5rem; width:100%; border:none; cursor:pointer; background: linear-gradient(90deg,#6d28d9,#5b21b6); color: #fff; }
+.btn-confirmed { background: #16a34a; color: #fff; cursor: not-allowed; }
+.warning-box { margin-top:1rem; padding:0.75rem; background:#fffbeb; border:1px solid #fef3c7; border-radius:0.5rem; text-align:center; color:#92400e; }

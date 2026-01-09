@@ -3,6 +3,7 @@ import axios from '../utils/axiosConfig';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
+import './styles/Profile.css';
 
 function Profile() {
   const { token, userId, logout, username } = useAuth();
@@ -99,10 +100,10 @@ function Profile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex-center bg-gradient-to-br from-green-50 to-green-100">
+      <div className="page-bg flex-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-          <p className="text-green-700 font-medium">Loading profile...</p>
+          <div className="spinner spinner-large spinner-green" aria-hidden="true"></div>
+          <p className="text-success font-medium">Loading profile...</p>
         </div>
       </div>
     );
@@ -110,7 +111,7 @@ function Profile() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex-center bg-gradient-to-br from-green-50 to-green-100">
+      <div className="page-bg flex-center">
         <div className="card text-center">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Profile</h2>
           <p className="text-gray-600 mb-4">{error.message}</p>
@@ -123,25 +124,25 @@ function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 py-12">
+    <div className="page-bg py-12 profile-page">
       <div className="container">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto profile-wrapper">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold profile-title">
               {isOwnProfile ? 'My Profile' : `${profile.username}'s Profile`}
             </h1>
-            <p className="text-gray-600">
+            <p className="modal-text">
               {isOwnProfile ? 'Manage your account and preferences' : 'View user profile'}
             </p>
           </div>
 
           {/* Profile Card */}
-          <div className="card">
+          <div className="card profile-card">
             {/* Profile Picture Section */}
             <div className="text-center mb-8">
               <div className="relative inline-block">
-                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-green-300 to-green-500 text-white flex items-center justify-center mx-auto mb-4 overflow-hidden ring-4 ring-white shadow-lg">
+                <div className="profile-avatar avatar-bg-green ring-4">
                   {profile.profile_image_url ? (
                     <img
                       src={profile.profile_image_url}
@@ -149,7 +150,7 @@ function Profile() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-green-300 to-green-500 flex items-center justify-center">
+                    <div className="w-full h-full avatar-bg-green flex items-center justify-center">
                       <span className="text-4xl font-bold">
                         {profile.username ? profile.username[0].toUpperCase() : '?'}
                       </span>
@@ -158,27 +159,21 @@ function Profile() {
                 </div>
 
                 {isOwnProfile && (
-                  <div className="absolute -bottom-2 -right-2">
-                    <label className="cursor-pointer bg-green-400 hover:bg-green-500 text-white p-3 rounded-full shadow-lg transition-colors flex items-center justify-center">
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                        />
-                      </svg>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                      />
+                  <div className="absolute" style={{ right: '-8px', bottom: '-8px' }}>
+                    <input
+                      id="profile-image-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      style={{ display: 'none' }}
+                      aria-hidden="true"
+                    />
+                    <label
+                      htmlFor="profile-image-input"
+                      className="upload-btn"
+                      title="Upload profile picture"
+                    >
+                      <span style={{ marginLeft: '0.5rem', fontWeight: 600 }}>Upload Your Pic</span>
                     </label>
                   </div>
                 )}
@@ -207,11 +202,12 @@ function Profile() {
             {/* Bio Section */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Bio</h3>
+                <h3 className="text-lg font-semibold">Bio</h3>
                 {isOwnProfile && !editingBio && (
                   <button
                     onClick={() => setEditingBio(true)}
-                    className="text-green-600 hover:text-green-700 text-sm font-medium"
+                    className="edit-btn"
+                    aria-label="Edit bio"
                   >
                     Edit
                   </button>
@@ -242,8 +238,8 @@ function Profile() {
                   </div>
                 </div>
               ) : (
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-gray-700">
+                <div className="panel bio-panel">
+                  <p className="text-muted">
                     {profile.bio ||
                       (isOwnProfile ? 'No bio yet. Click edit to add one!' : 'No bio available.')}
                   </p>

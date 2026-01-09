@@ -1,5 +1,12 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+  useLocation,
+  Link,
+} from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import RegistrationForm from './components/RegistrationForm';
 import ChatList from './components/ChatList';
@@ -14,37 +21,34 @@ import './App.css';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
-  
+
   return null;
 }
 
 function Navigation() {
   const { isAuth, username, logout } = useAuth();
-  
+
   if (!isAuth) return null;
-  
+
   return (
-    <nav className="bg-white/90 backdrop-blur-sm border-b border-green-100">
+    <nav className="nav">
       <div className="container">
         <div className="flex-between py-4">
-          <div className="flex items-center space-x-8">
-            <Link to="/chats" className="text-green-600 hover:text-green-700 font-medium transition-colors">
+          <div className="nav-links">
+            <Link to="/chats" className="nav-link">
               Chats
             </Link>
-            <Link to="/profile" className="text-green-600 hover:text-green-700 font-medium transition-colors">
+            <Link to="/profile" className="nav-link">
               Profile
             </Link>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-green-700 font-medium">Welcome, {username}!</span>
-            <button
-              onClick={logout}
-              className="btn-danger text-sm"
-            >
+            <span className="nav-welcome">Welcome, {username}!</span>
+            <button onClick={logout} className="btn-danger text-sm">
               Logout
             </button>
           </div>
@@ -71,14 +75,14 @@ function AppContent() {
 
   return (
     <div className="App">
-      <ToastContainer 
-        position="top-right" 
-        autoClose={4000} 
-        hideProgressBar={false} 
-        newestOnTop 
-        closeOnClick 
-        pauseOnFocusLoss 
-        draggable 
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnFocusLoss
+        draggable
         pauseOnHover
         toastStyle={{
           backgroundColor: 'white',
@@ -91,7 +95,7 @@ function AppContent() {
         <ScrollToTop />
         <Header />
         <Navigation />
-        
+
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
@@ -107,13 +111,13 @@ function AppContent() {
               path="/chats"
               element={isAuth ? <ChatList /> : <Navigate to="/login" replace />}
             />
-           <Route 
-              path="/profile" 
-              element={isAuth ? <Profile /> : <Navigate to="/login" replace />} 
+            <Route
+              path="/profile"
+              element={isAuth ? <Profile /> : <Navigate to="/login" replace />}
             />
-            <Route 
-              path="/profile/:userId" 
-              element={isAuth ? <Profile /> : <Navigate to="/login" replace />} 
+            <Route
+              path="/profile/:userId"
+              element={isAuth ? <Profile /> : <Navigate to="/login" replace />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -125,13 +129,19 @@ function AppContent() {
 
 function Header() {
   const { isAuth } = useAuth();
-  
+
   return (
     <header className="App-header">
       <div className="container">
         <div className="flex-between">
           <Link to="/" className="text-decoration-none flex items-center space-x-3">
-            <img src="/logo.png" alt="Swapanza logo" width={40} height={40} style={{borderRadius: '8px'}} />
+            <img
+              src="/logo.png"
+              alt="Swapanza logo"
+              width={40}
+              height={40}
+              style={{ borderRadius: '8px' }}
+            />
             <h1>Swapanza</h1>
           </Link>
           {!isAuth && (

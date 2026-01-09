@@ -1,4 +1,5 @@
 import React from 'react';
+import './styles/SwapanzaOptionsModal.css';
 import PropTypes from 'prop-types';
 import { SWAPANZA } from '../constants';
 
@@ -10,20 +11,18 @@ function SwapanzaOptionsModal({ isOpen, duration, onDurationChange, onStart, onC
 
   return (
     <div className="modal-overlay">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="modal-content modal-md">
         <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">Start Swapanza</h3>
+          <h3 className="modal-subtitle mb-4">Start Swapanza</h3>
 
-          <p className="mb-6 text-gray-600">
+          <p className="modal-text mb-6">
             Swap identities with your chat partner for the specified duration. During Swapanza, each
             user can send up to {SWAPANZA.MESSAGE_LIMIT} messages of max 7 characters with no
             spaces.
           </p>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Duration (minutes)
-            </label>
+            <label className="label mb-2">Duration (minutes)</label>
             <select
               value={duration}
               onChange={(e) => onDurationChange(Number(e.target.value))}
@@ -37,11 +36,11 @@ function SwapanzaOptionsModal({ isOpen, duration, onDurationChange, onStart, onC
             </select>
           </div>
 
-          <div className="flex space-x-3">
+          <div className="modal-footer">
             <button onClick={onClose} className="btn-secondary flex-1">
               Cancel
             </button>
-            <button onClick={onStart} className="btn-primary flex-1">
+            <button onClick={onStart} className="btn-confirm flex-1">
               Start Swapanza
             </button>
           </div>

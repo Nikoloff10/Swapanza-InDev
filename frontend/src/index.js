@@ -6,9 +6,7 @@ import axios from 'axios';
 import './utils/axiosConfig';
 import { validateToken } from './utils/tokenUtils';
 
-// Set the base URL for all axios requests.
-
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Base URL for axios is configured in ./utils/axiosConfig.js (uses VITE_API_URL)
 
 // Configure Axios to handle Django's CSRF protection.
 
@@ -21,7 +19,6 @@ const isAuthPage = () => {
   const path = window.location.pathname;
   return path === '/login' || path === '/register' || path === '/';
 };
-
 
 if (!isAuthPage()) {
   validateToken();

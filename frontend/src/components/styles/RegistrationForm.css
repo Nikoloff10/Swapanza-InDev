@@ -1,0 +1,4 @@
+/* RegistrationForm styles */
+.registration-form { max-width: 28rem; margin: 0 auto; }
+.registration-form .input-field { margin-bottom: 0.75rem; }
+.registration-actions { display:flex; gap:0.75rem; }

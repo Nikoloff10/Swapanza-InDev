@@ -1,0 +1,4 @@
+/* Swapanza modal styles */
+@import './Modal.css';
+.modal-header-gradient { padding: 1rem 1.25rem; }
+.info-box--purple { margin-bottom: 1rem; }

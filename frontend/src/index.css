@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 :root {
   /* Theme Colors */
   --primary-50: #ffffff;
@@ -47,6 +43,9 @@
   --radius-2xl: 1.5rem;
 }
 
+/* Use border-box for predictable sizing */
+*, *::before, *::after { box-sizing: border-box; }
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -57,6 +56,34 @@ body {
   background-color: var(--neutral-50);
   color: var(--neutral-900);
   line-height: 1.6;
+}
+
+/* Links - remove default underlines site-wide and ensure accessible focus styles remain */
+a, a:link, a:visited {
+  text-decoration: none;
+  color: inherit;
+}
+
+a:focus { outline: 3px solid rgba(16,185,129,0.15); outline-offset: 2px; }
+
+/* Ensure buttons and link-like buttons don't show underlines */
+.btn-primary, .btn-secondary, .btn-danger, .nav-link { text-decoration: none; }
+
+/* Link button used in auth footers (now simple bold black text) */
+.link-button {
+  display: inline-block;
+  padding: 0;
+  border-radius: 0;
+  color: var(--neutral-900);
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  transition: none;
+}
+.link-button:hover,
+.link-button:focus {
+  text-decoration: none;
+  color: var(--neutral-900);
 }
 
 
@@ -70,32 +97,193 @@ code {
 }
 
 /* Custom Component Classes */
-@layer components {
   .btn-primary {
-    @apply bg-green-400 hover:bg-green-500 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 ease-in-out shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--primary-400);
+    color: white;
+    font-weight: 500;
+    padding: 0.625rem 1rem;
+    border-radius: var(--radius-md);
+    transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
+    box-shadow: var(--shadow-md);
+    transform: translateY(0);
+    border: none;
+    cursor: pointer;
+  }
+  .btn-primary:hover,
+  .btn-primary:focus {
+    background: var(--primary-500);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
   }
   
   .btn-secondary {
-    @apply bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2.5 px-4 rounded-lg transition-all duration-200 ease-in-out shadow-sm hover:shadow-md;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--neutral-100);
+    color: var(--neutral-800);
+    font-weight: 500;
+    padding: 0.625rem 1rem;
+    border-radius: var(--radius-md);
+    transition: background 200ms ease, box-shadow 200ms ease;
+    box-shadow: var(--shadow-sm);
+    border: none;
+    cursor: pointer;
+  }
+  .btn-secondary:hover,
+  .btn-secondary:focus {
+    background: var(--neutral-200);
+    box-shadow: var(--shadow-md);
   }
   
   .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 ease-in-out shadow-md hover:shadow-lg;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--accent-red);
+    color: white;
+    font-weight: 500;
+    padding: 0.625rem 1rem;
+    border-radius: var(--radius-md);
+    transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
+    box-shadow: var(--shadow-md);
+    transform: translateY(0);
+    border: none;
+    cursor: pointer;
+  }
+  .btn-danger:hover,
+  .btn-danger:focus {
+    background: #dc2626; /* slightly darker red */
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
+  /* Ensure buttons with full-width utility behave like blocks and respect padding */
+  .btn-primary.w-full,
+  .btn-secondary.w-full,
+  .btn-danger.w-full {
+    display: block;
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
   }
   
   .card {
-    @apply bg-white rounded-xl shadow-lg border border-gray-100 p-6;
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid #f3f4f6;
+    padding: 1.5rem;
   }
   
   .input-field {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 bg-white;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: var(--radius-md);
+    background: white;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+    box-sizing: border-box;
   }
+  .input-field:focus {
+    outline: none;
+    border-color: var(--primary-600);
+    box-shadow: 0 0 0 6px rgba(16,185,129,0.08);
+  }
+
   
   .modal-overlay {
-    @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
   }
   
-  .modal-content {
-    @apply bg-white rounded-xl shadow-2xl max-w-md w-full mx-4;
-  }
-}
+  .btn-confirm { background: linear-gradient(90deg,#6d28d9,#5b21b6); color: #fff; }
+  .btn-confirmed { background: #16a34a; color: #fff; cursor: not-allowed; }
+  .status-message { margin-top:1rem; padding:0.75rem; background:#ecfdf5; border:1px solid #bbf7d0; border-radius:0.5rem; text-align:center; color:#065f46; }
+  .warning-box { margin-top:1rem; padding:0.75rem; background:#fffbeb; border:1px solid #fef3c7; border-radius:0.5rem; text-align:center; color:#92400e; }
+
+
+
+
+  
+
+  /* Minimal utility classes to replace Tailwind usage */
+  .flex { display: flex; }
+  .items-center { align-items: center; }
+  .justify-between { justify-content: space-between; }
+  .flex-center { display:flex; align-items:center; justify-content:center; }
+  .space-x-3 { gap: 0.75rem; }
+  .space-x-4 { gap: 1rem; }
+  .gap-4 { gap: 1rem; }
+  .space-y-3 > * + * { margin-top: 0.75rem; }
+  /* Prevent resizable textareas when a `resize-none` utility is used */
+  .resize-none { resize: none; }
+  .min-h-screen { min-height: 100vh; }
+  .w-full { width: 100%; }
+  .h-full { height: 100%; }
+  .items-end { align-items: flex-end; }
+  .flex-shrink-0 { flex-shrink: 0; }
+  .whitespace-pre-wrap { white-space: pre-wrap; }
+  .leading-relaxed { line-height: 1.6; }
+  .rounded-full { border-radius: 9999px; }
+  .rounded-lg { border-radius: 0.5rem; }
+  .rounded-xl { border-radius: 0.75rem; }
+  .shadow-md { box-shadow: var(--shadow-md); }
+  .shadow-lg { box-shadow: var(--shadow-lg); }
+  .px-4 { padding-left: 1rem; padding-right: 1rem; }
+  .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+  .p-4 { padding: 1rem; }
+  .p-6 { padding: 1.5rem; }
+  .text-center { text-align: center; }
+  .max-w-4xl { max-width: 64rem; }
+  .max-w-md { max-width: 28rem; }
+  .space-y-6 > * + * { margin-top: 1.5rem; }
+  /* smaller vertical spacing utility (used for profile action buttons) */
+  .space-y-3 > * + * { margin-top: 0.75rem; }
+  .my-6 { margin-top: 1.5rem; margin-bottom: 1.5rem; }
+  .mr-2 { margin-right: 0.5rem; }
+
+  .animate-spin { animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+
+  .divider { position: relative; margin: 1.5rem 0; text-align: center; }
+  .divider::before { content: ''; display:block; width:100%; height:1px; background: #e5e7eb; position: absolute; left:0; top:50%; transform:translateY(-50%); }
+  .divider-text { position: relative; display:inline-block; background:white; padding:0 0.5rem; color:var(--neutral-500); }
+
+  /* Typography utility classes */
+  .text-5xl { font-size: 3rem; line-height: 1.1; }
+  .text-3xl { font-size: 1.875rem; }
+  .text-xl { font-size: 1.25rem; }
+  .text-lg { font-size: 1.125rem; }
+  .text-sm { font-size: 0.875rem; }
+  .text-xs { font-size: 0.75rem; }
+
+  .font-bold { font-weight: 700; }
+  .font-semibold { font-weight: 600; }
+  .font-medium { font-weight: 500; }
+
+  /* Spacing utilities */
+  .mb-8 { margin-bottom: 2rem; }
+  .mb-6 { margin-bottom: 1.5rem; }
+  .mb-4 { margin-bottom: 1rem; }
+  .py-20 { padding-top: 5rem; padding-bottom: 5rem; }
+  .py-12 { padding-top: 3rem; padding-bottom: 3rem; }
+
+  /* Grid utilities */
+  .grid { display: grid; }
+  .grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+  @media (min-width: 768px) { .md\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1024px) { .lg\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); } }
+  .gap-6 { gap: 1.5rem; }
+

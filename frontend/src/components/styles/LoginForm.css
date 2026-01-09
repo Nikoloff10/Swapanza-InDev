@@ -1,0 +1,4 @@
+/* LoginForm styles */
+.login-form { max-width: 28rem; margin: 0 auto; }
+.login-form .input-field { margin-bottom: 0.75rem; }
+.login-actions { display:flex; gap:0.75rem; }

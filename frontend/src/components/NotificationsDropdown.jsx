@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FaBell } from 'react-icons/fa';
 import UserAvatar from './UserAvatar';
+import './styles/NotificationsDropdown.css';
 
 /**
  * NotificationsDropdown - Notification bell with dropdown panel
@@ -17,31 +18,30 @@ function NotificationsDropdown({
   onClearAll,
 }) {
   return (
-    <div className="relative">
+    <div className="notifications-dropdown">
       <button
         onClick={onToggle}
-        className="p-3 bg-green-100 hover:bg-green-200 rounded-full transition-colors duration-200 relative"
+        className="notif-toggle"
+        aria-haspopup="true"
+        aria-expanded={isOpen}
       >
-        <FaBell className="text-green-600 w-4 h-4" />
+        <FaBell className="notif-icon" />
         {totalUnread > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+          <span className="notif-badge" role="status" aria-label={`${totalUnread} unread`}>
             {totalUnread}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-2xl z-20 border border-gray-100">
-          <div className="p-4 border-b border-gray-100 font-semibold flex justify-between items-center">
-            <span className="text-gray-900">Notifications</span>
-            <button
-              onClick={onClearAll}
-              className="text-sm text-green-600 hover:text-green-700 font-medium"
-            >
+        <div className="notif-panel" role="menu" aria-label="Notifications panel">
+          <div className="notif-panel-header">
+            <span className="notif-panel-title">Notifications</span>
+            <button onClick={onClearAll} className="notif-clear-btn">
               Clear All
             </button>
           </div>
-          <div className="max-h-80 overflow-y-auto">
+          <div className="notif-list">
             {Object.keys(unreadCounts).length > 0 ? (
               Object.entries(unreadCounts).map(([chatId, count]) => {
                 const chat = chats.find((c) => c.id.toString() === chatId);
@@ -77,19 +77,14 @@ function NotificationsDropdown({
  */
 function NotificationItem({ username, profileImageUrl, count, isSwapanzaInvite, onClick }) {
   return (
-    <div
-      className="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors duration-200"
-      onClick={onClick}
-    >
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-3">
+    <div className="notif-item" onClick={onClick} role="menuitem" tabIndex={0}>
+      <div className="notif-item-row">
+        <div className="notif-item-left">
           <UserAvatar username={username} profileImageUrl={profileImageUrl} size="sm" />
-          <span className="font-medium text-gray-900">{username || 'Unknown'}</span>
+          <span className="notif-username">{username || 'Unknown'}</span>
         </div>
         <span
-          className={`${
-            isSwapanzaInvite ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
-          } text-xs font-medium px-3 py-1 rounded-full`}
+          className={`notif-pill ${isSwapanzaInvite ? 'notif-pill--swapanza' : 'notif-pill--count'}`}
         >
           {isSwapanzaInvite ? 'Swapanza' : `${count} new`}
         </span>
@@ -103,9 +98,9 @@ function NotificationItem({ username, profileImageUrl, count, isSwapanzaInvite, 
  */
 function EmptyNotifications() {
   return (
-    <div className="p-8 text-center text-gray-500">
-      <p className="font-medium">All caught up!</p>
-      <p className="text-sm">No new messages</p>
+    <div className="notif-empty">
+      <p className="notif-empty-title">All caught up!</p>
+      <p className="notif-empty-sub">No new messages</p>
     </div>
   );
 }

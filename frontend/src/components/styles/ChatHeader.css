@@ -1,0 +1,55 @@
+/* ChatHeader styles */
+.chat-header-card { padding: 1rem; }
+.chat-header-row { display:flex; align-items:center; justify-content:space-between; }
+.chat-header-left { display:flex; align-items:center; gap:1rem; }
+.chat-header-actions { display:flex; align-items:center; gap:0.75rem; }
+
+.chat-header {
+  background: linear-gradient(90deg, #34d399 0%, #10b981 100%);
+  color: white;
+  padding: 1rem;
+  border-top-left-radius: 0.75rem;
+  border-top-right-radius: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* Close button for chat header */
+.chat-close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.85);
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, transform 100ms ease;
+}
+.chat-close-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.chat-close-btn:focus {
+  outline: 3px solid rgba(16,185,129,0.15);
+  outline-offset: 2px;
+}
+.chat-close-btn svg { width: 1.25rem; height: 1.25rem; }
+.chat-close-btn[aria-disabled="true"] { opacity: 0.6; cursor: not-allowed; }
+
+/* Profile button styled (light blue variant) used in header */
+.profile-toggle {
+  padding: 0.6rem;
+  background: rgba(59,130,246,0.12);
+  border-radius: 9999px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease, transform 120ms ease;
+}
+.profile-toggle:hover { background: rgba(59,130,246,0.16); transform: translateY(-1px); }
+.profile-toggle:focus { outline: 3px solid rgba(59,130,246,0.12); outline-offset: 2px; }
+.profile-toggle .notif-icon { color: var(--accent-blue); width: 1rem; height: 1rem; display:block; }

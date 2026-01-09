@@ -13,6 +13,8 @@ import { useChatWebSocket } from '../hooks/useChatWebSocket';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { useSwapanza } from '../hooks/useSwapanza';
 import { SWAPANZA } from '../constants';
+import './styles/ChatModal.css';
+import './styles/Modal.css';
 
 function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSwapanzaInvite }) {
   const { token, userId: currentUserId, username } = useAuth();
@@ -341,11 +343,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   if (loading) {
     return (
       <div className="modal-overlay">
-        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-              <p className="text-green-700 font-medium">Loading chat...</p>
+        <div className="modal-content modal-chat">
+          <div className="modal-body-center">
+            <div className="modal-loading">
+              <div className="spinner spinner-large spinner-green" aria-hidden="true"></div>
+              <p className="text-success font-medium">Loading chat...</p>
             </div>
           </div>
         </div>
@@ -357,11 +359,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   if (error) {
     return (
       <div className="modal-overlay">
-        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center py-12">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Chat</h2>
-              <p className="text-gray-600 mb-4">{error}</p>
+        <div className="modal-content modal-chat">
+          <div className="modal-body-center">
+            <div className="modal-error">
+              <h2 className="modal-title">Error Loading Chat</h2>
+              <p className="modal-text mb-4">{error}</p>
               <button onClick={onClose} className="btn-primary">
                 Close
               </button>
@@ -376,11 +378,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   if (!chat) {
     return (
       <div className="modal-overlay">
-        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center py-12">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Chat Not Found</h2>
-              <p className="text-gray-600 mb-4">The requested chat could not be found.</p>
+        <div className="modal-content modal-chat">
+          <div className="modal-body-center">
+            <div className="modal-error">
+              <h2 className="modal-title">Chat Not Found</h2>
+              <p className="modal-text mb-4">The requested chat could not be found.</p>
               <button onClick={onClose} className="btn-primary">
                 Close
               </button>
@@ -393,7 +395,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
   return (
     <div className="modal-overlay">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 h-[90vh] flex flex-col">
+      <div className="modal-content modal-chat">
         {/* Header */}
         <ChatHeader
           otherParticipant={otherParticipant}
@@ -405,16 +407,14 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
 
         {/* Invitation banner */}
         {swapanza.pendingSwapanzaInvite && !swapanza.showSwapanzaModal && (
-          <div className="border-t p-3 bg-yellow-50 flex-shrink-0">
-            <div className="max-w-2xl mx-auto flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div>
-                  <div className="font-semibold text-yellow-800">Swapanza invitation</div>
-                  <div className="text-sm text-yellow-700">
-                    {swapanza.swapanzaRequestedByUsername
-                      ? `${swapanza.swapanzaRequestedByUsername} invited you`
-                      : 'You have a Swapanza invitation'}
-                  </div>
+          <div className="swapanza-banner">
+            <div className="swapanza-banner-inner">
+              <div className="swapanza-banner-left">
+                <div className="swapanza-banner-title">Swapanza invitation</div>
+                <div className="swapanza-banner-sub">
+                  {swapanza.swapanzaRequestedByUsername
+                    ? `${swapanza.swapanzaRequestedByUsername} invited you`
+                    : 'You have a Swapanza invitation'}
                 </div>
               </div>
               <button
@@ -422,7 +422,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
                   swapanza.setShowSwapanzaModal(true);
                   swapanza.setPendingSwapanzaInvite(false);
                 }}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-150"
+                className="btn-purple"
               >
                 View Invitation
               </button>
@@ -431,21 +431,17 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div className="messages-container">
           {/* Load More Button */}
           {hasMore && messages.length > 0 && (
-            <div className="text-center mb-4">
-              <button
-                onClick={loadMoreMessages}
-                disabled={loadingMore}
-                className="px-4 py-2 text-sm text-purple-600 hover:text-purple-800 disabled:text-gray-400"
-              >
+            <div className="load-more">
+              <button onClick={loadMoreMessages} disabled={loadingMore} className="btn-link">
                 {loadingMore ? 'Loading...' : 'Load older messages'}
               </button>
             </div>
           )}
           {messages.length === 0 ? (
-            <div className="text-center text-gray-500 my-8">
+            <div className="empty-messages">
               <p>No messages yet</p>
               <p className="text-sm">Start the conversation!</p>
             </div>
@@ -455,7 +451,11 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
               return (
                 <div
                   key={msg.id}
-                  className={isCurrentUser ? 'flex justify-end mb-3' : 'flex justify-start mb-3'}
+                  className={
+                    isCurrentUser
+                      ? 'message-row message-row--right'
+                      : 'message-row message-row--left'
+                  }
                 >
                   <ChatMessage
                     message={msg}
@@ -471,7 +471,7 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
         </div>
 
         {/* Swapanza Status */}
-        <div className="flex-shrink-0">
+        <div className="status-bar-wrapper">
           <SwapanzaStatusBar
             isSwapanzaActive={swapanza.isSwapanzaActive}
             swapanzaEndTime={swapanza.swapanzaEndTime}

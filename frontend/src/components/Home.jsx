@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import './styles/Home.css';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -31,9 +32,9 @@ const Home = () => {
     <div className="flex flex-col h-full">
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="py-20 bg-gradient-to-br from-green-50 via-white to-green-50">
+        <section className="hero-section">
           <div className="container">
-            <div className="text-center max-w-4xl mx-auto">
+            <div className="hero-text">
               <div className="mb-8">
                 <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
                   Welcome to <span className="text-gradient">Swapanza</span>
@@ -44,9 +45,9 @@ const Home = () => {
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="hero-buttons">
                 <Link to="/login" className="btn-primary text-lg px-8 py-4">
-                  Get Started
+                  Login
                 </Link>
                 <Link to="/register" className="btn-secondary text-lg px-8 py-4">
                   Create Account
@@ -76,16 +77,16 @@ const Home = () => {
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 bg-gray-50">
+        <section className="py-20 bg-gray-50 cta-section">
           <div className="container">
-            <div className="text-center max-w-3xl mx-auto">
+            <div className="cta-content">
               <h2 className="text-3xl font-bold text-gray-900 mb-6">
                 Ready to Start Your Swapanza?
               </h2>
               <p className="text-lg text-gray-600 mb-8">
                 Join the fun, the more people to mess with - the better.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="hero-buttons">
                 <Link to="/register" className="btn-primary text-lg px-8 py-4">
                   Register
                 </Link>
@@ -98,7 +99,7 @@ const Home = () => {
         </section>
       </main>
 
-      <footer className="bg-gray-900 text-white py-12 mt-auto">
+      <footer className="site-footer mt-auto">
         <div className="container">
           <div className="text-center">
             <h3 className="text-xl font-semibold mb-2">Swapanza</h3>

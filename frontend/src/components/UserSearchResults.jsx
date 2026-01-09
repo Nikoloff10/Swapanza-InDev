@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FaPlus } from 'react-icons/fa';
 import UserAvatar from './UserAvatar';
+import './styles/UserSearchResults.css';
 
 /**
  * UserSearchResults - Dropdown showing user search results
@@ -12,22 +13,17 @@ function UserSearchResults({ results, onSelectUser }) {
   }
 
   return (
-    <div className="mt-4 space-y-2">
+    <div className="user-search-results">
       {results.map((user) => (
-        <div
-          key={user.id}
-          onClick={() => onSelectUser(user.id)}
-          className="flex items-center justify-between p-3 bg-gray-50 hover:bg-green-50 rounded-lg cursor-pointer transition-colors duration-200 border border-gray-100"
-        >
-          <div className="flex items-center space-x-3">
+        <div key={user.id} onClick={() => onSelectUser(user.id)} className="user-search-item">
+          <div className="user-search-item-left">
             <UserAvatar
               username={user.username}
               profileImageUrl={user.profile_image_url}
               size="sm"
             />
-            <span className="font-medium text-gray-900">{user.username}</span>
+            <span className="user-search-username">{user.username}</span>
           </div>
-          <FaPlus className="text-green-500 w-4 h-4" />
         </div>
       ))}
     </div>

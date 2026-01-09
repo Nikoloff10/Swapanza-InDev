@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import './styles/RegistrationForm.css';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from '../utils/axiosConfig';
 import { toast } from 'react-toastify';
@@ -46,8 +47,8 @@ function RegistrationForm() {
   };
 
   return (
-    <div className="min-h-screen flex-center bg-gradient-to-br from-green-50 to-green-100 py-12">
-      <div className="w-full max-w-md">
+    <div className="page-bg flex-center py-12 auth-wrapper">
+      <div className="w-full max-w-md auth-container">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Join Swapanza</h1>
@@ -56,7 +57,7 @@ function RegistrationForm() {
 
         {/* Registration Form */}
         <div className="card">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="form space-y-6">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
                 Username
@@ -139,13 +140,8 @@ function RegistrationForm() {
           </form>
 
           {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Already have an account?</span>
-            </div>
+          <div className="divider">
+            <span className="divider-text">Already have an account?</span>
           </div>
 
           {/* Login Link */}
@@ -158,13 +154,7 @@ function RegistrationForm() {
 
         {/* Footer Links */}
         <div className="text-center mt-6">
-          <div className="flex justify-center space-x-4 text-sm text-gray-500">
-            <Link to="/" className="hover:text-green-600 transition-colors">
-              Back to Home
-            </Link>
-            <span>•</span>
-            <span className="text-green-600">Terms of Service</span>
-          </div>
+          <div className="flex justify-center space-x-4 text-sm text-gray-500"></div>
         </div>
       </div>
     </div>

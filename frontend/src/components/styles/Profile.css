@@ -1,0 +1,78 @@
+/* Profile page styles */
+.profile-card {
+  background: var(--card-bg);
+  border-radius: 0.5rem;
+  padding: 1.4rem;
+  box-shadow: var(--shadow-md);
+  /* Make the card big on desktop as the user prefers */
+  min-width: 80vh; /* user preferred desktop size */
+  max-width: 90rem;
+}
+
+/* Gradual scales down as the viewport shrinks */
+@media (max-width: 1200px) { .profile-card { min-width: 60vh; } }
+@media (max-width: 1024px) { .profile-card { min-width: 48vh; } }
+@media (max-width: 768px) {
+  /* Ensure the card can shrink properly on tablets */
+  .profile-card { min-width: 36rem; padding: 1rem; }
+}
+@media (max-width: 480px) {
+  /* Mobile: remove the large min-width and use full width */
+  .profile-card { min-width: 0; width: 100%; padding: 0.75rem; }
+}
+
+.profile-avatar { width: 13rem; height: 13rem; border-radius:9999px; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; margin: 0 auto 1.25rem; box-shadow: var(--shadow-xl); }
+.upload-btn { background: linear-gradient(90deg,#34d399,#10b981); color: #fff; padding: 0.75rem; border-radius:9999px; display:inline-flex; align-items:center; justify-content:center; box-shadow: var(--shadow-lg); border:none; cursor:pointer; }
+.upload-btn:hover { filter:brightness(0.95); }
+
+.profile-title { font-size: 3rem; line-height: 1.05; margin-bottom: 0.5rem; }
+.profile-page .modal-text { font-size: 1.125rem; }
+.profile-page .btn-primary, .profile-page .btn-danger { padding: 0.9rem 1.25rem; font-size: 1.05rem; }
+
+/* Bio panel: constrain height and enable scrolling for very long bios */
+.bio-panel {
+  max-height: 10rem; /* adjust if you prefer a different height */
+  overflow: auto;
+  word-break: break-word;
+  white-space: pre-wrap; /* preserve newlines */
+  -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+}
+@media (max-width: 768px) {
+  .bio-panel { max-height: 8rem; }
+}
+
+/* Edit button for bio */
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary-700);
+  background: transparent;
+  border: 1px solid rgba(16,185,129,0.12);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, transform 100ms ease, box-shadow 150ms ease;
+}
+.edit-btn:hover {
+  background: rgba(16,185,129,0.12);
+  color: #065f46;
+  transform: translateY(-1px);
+}
+.edit-btn:focus {
+  outline: 3px solid rgba(16,185,129,0.12);
+  outline-offset: 2px;
+}
+@media (max-width: 480px) {
+  .edit-btn { padding: 0.3rem 0.5rem; font-size: 0.825rem; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .profile-avatar { width: 9rem; height: 9rem; }
+  .profile-title { font-size: 2rem; }
+  .profile-card { padding: 1.25rem; }
+  .profile-page .btn-primary, .profile-page .btn-danger { padding: 0.7rem 1rem; font-size: 1rem; }
+}

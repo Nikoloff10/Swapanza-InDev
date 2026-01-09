@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FaTimes } from 'react-icons/fa';
 import UserAvatar from './UserAvatar';
+import './styles/ChatListItem.css';
 
 /**
  * ChatListItem - Individual chat card in the chat list
@@ -43,8 +44,9 @@ function ChatListItem({ chat, currentUserId, unreadCount, onOpen, onRemove }) {
           )}
           <button
             onClick={handleRemove}
-            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors duration-200"
+            className="chat-item-close"
             title="Close chat"
+            aria-label="Close chat"
           >
             <FaTimes className="w-4 h-4" />
           </button>

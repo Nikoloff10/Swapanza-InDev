@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import './styles/ChatList.css';
 import axios from '../utils/axiosConfig';
 import { useNavigate } from 'react-router-dom';
 import { FaUser, FaSearch, FaTimes } from 'react-icons/fa';
@@ -152,13 +153,13 @@ function ChatList() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100">
+    <div className="page-bg">
       <div className="container py-8">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <div className="card mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
+          <div className="card mb-6 chat-header-card">
+            <div className="chat-header-row">
+              <div className="chat-header-left">
                 {/* Profile Picture */}
                 <UserAvatar
                   username={username}
@@ -168,19 +169,20 @@ function ChatList() {
                 />
 
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Chats</h1>
-                  <p className="text-gray-600 text-sm">Welcome back, {username}!</p>
+                  <h1 className="chat-title">Chats</h1>
+                  <p className="chat-subtitle">Welcome back, {username}!</p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
+              <div className="chat-header-actions">
                 {/* Profile Button */}
                 <button
                   onClick={handleProfileClick}
-                  className="p-3 bg-green-100 hover:bg-green-200 rounded-full transition-colors duration-200"
+                  className="profile-toggle"
                   title="View Profile"
+                  aria-label="View profile"
                 >
-                  <FaUser className="text-green-600 w-4 h-4" />
+                  <FaUser className="notif-icon" />
                 </button>
 
                 {/* Notifications */}
@@ -204,22 +206,19 @@ function ChatList() {
           </div>
 
           {/* Search Section */}
-          <div className="card mb-6">
-            <div className="relative">
-              <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <div className="card mb-6 search-card">
+            <div className="search-row">
+              <FaSearch className="search-icon" />
               <input
                 type="text"
                 placeholder="Search users to start chatting..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="input-field pl-12"
+                className="input-field search-input"
               />
               {searchQuery && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <FaTimes className="w-4 h-4" />
+                <button onClick={clearSearch} className="clear-btn" aria-label="Clear search">
+                  <FaTimes className="clear-icon" />
                 </button>
               )}
             </div>
@@ -238,7 +237,7 @@ function ChatList() {
           )}
 
           {/* Chat List */}
-          <div className="space-y-3">
+          <div className="chat-list">
             {chats.length > 0 ? (
               chats.map((chat) => (
                 <ChatListItem
@@ -251,9 +250,9 @@ function ChatList() {
                 />
               ))
             ) : (
-              <div className="card text-center py-12">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No chats yet</h3>
-                <p className="text-gray-600 mb-4">
+              <div className="card no-chats-card">
+                <h3 className="no-chats-title">No chats yet</h3>
+                <p className="no-chats-text">
                   Search for users above to start your first conversation!
                 </p>
               </div>

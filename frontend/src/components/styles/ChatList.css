@@ -1,0 +1,5 @@
+/* ChatList specific styles */
+.chat-list { display:flex; flex-direction:column; gap:0.75rem; }
+.no-chats-card { padding:3rem; text-align:center; }
+.no-chats-title { font-size:1.125rem; font-weight:600; margin-bottom:0.5rem; }
+.no-chats-text { color:var(--neutral-600); margin:0; }

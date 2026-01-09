@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import './styles/MessageInput.css';
 
 /**
  * MessageInput - Chat message input field with send button
@@ -34,7 +35,7 @@ function MessageInput({
       : 'btn-primary';
 
   return (
-    <div className="border-t bg-white p-4 flex-shrink-0 rounded-b-xl">
+    <div className="message-input-wrapper">
       <div className="flex space-x-3">
         <input
           type="text"

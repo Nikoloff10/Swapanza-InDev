@@ -1,5 +1,8 @@
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
+import UserAvatar from './UserAvatar';
+
+import './styles/ChatMessage.css';
 
 /**
  * ChatMessage - Renders a single chat message bubble
@@ -16,19 +19,17 @@ function ChatMessage({ message, isCurrentUser, participants, swapanzaPartner }) 
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Build message bubble styles
-  let messageStyle = isCurrentUser
-    ? `${
-        isDuringSwapanza
-          ? 'bg-gradient-to-r from-purple-500 to-purple-600'
-          : 'bg-gradient-to-r from-green-500 to-green-600'
-      } text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-xs break-words shadow-md`
-    : `${
-        isDuringSwapanza ? 'bg-gradient-to-r from-purple-100 to-purple-200' : 'bg-white'
-      } text-gray-900 rounded-2xl rounded-tl-md px-4 py-3 max-w-xs break-words shadow-sm border border-gray-100`;
+  // Build message bubble styles (semantic classes)
+  let messageStyle = 'msg-bubble';
+
+  if (isCurrentUser) {
+    messageStyle += isDuringSwapanza ? ' msg-sent-swapanza' : ' msg-sent';
+  } else {
+    messageStyle += isDuringSwapanza ? ' msg-received-swapanza' : ' msg-received';
+  }
 
   if (isPending) {
-    messageStyle += ' opacity-70';
+    messageStyle += ' msg-pending';
   }
 
   // Determine display name and avatar
@@ -61,17 +62,12 @@ function ChatMessage({ message, isCurrentUser, participants, swapanzaPartner }) 
     <div className="flex items-end space-x-3">
       {/* Avatar for other user's messages */}
       {!isCurrentUser && (
-        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-md">
-          {profileImage ? (
-            <img src={profileImage} alt={displayUsername} className="h-full w-full object-cover" />
-          ) : (
-            <div className="h-full w-full flex items-center justify-center">
-              <span className="text-sm font-bold text-white">
-                {displayUsername?.[0]?.toUpperCase() || '?'}
-              </span>
-            </div>
-          )}
-        </div>
+        <UserAvatar
+          username={displayUsername}
+          profileImageUrl={profileImage}
+          size="sm"
+          className="avatar-bg-green shadow-md"
+        />
       )}
 
       {/* Message bubble */}

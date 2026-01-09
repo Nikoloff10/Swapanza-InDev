@@ -1,4 +1,5 @@
 import React from 'react';
+import './styles/SwapanzaStatusBar.css';
 import PropTypes from 'prop-types';
 
 /**
@@ -23,31 +24,64 @@ function SwapanzaStatusBar({
   // Active Swapanza session
   if (isSwapanzaActive && swapanzaEndTime) {
     return (
-      <div className="border-t p-4 bg-gradient-to-r from-purple-50 to-purple-100">
+      <div className="swapanza-active">
         <div className="text-center">
-          <div className="flex items-center justify-center space-x-2 mb-2">
-            <span className="text-lg font-bold text-purple-800">Swapanza Active!</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              marginBottom: '0.5rem',
+            }}
+          >
+            <span style={{ fontSize: '1.125rem', fontWeight: 700, color: '#5b21b6' }}>
+              Swapanza Active!
+            </span>
           </div>
 
           {timeLeft !== null && (
-            <div className="text-sm text-purple-700 mb-2">
+            <div style={{ fontSize: '0.875rem', color: '#6d28d9', marginBottom: '0.5rem' }}>
               Time Left: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
             </div>
           )}
 
           {swapanzaStartTime && (
-            <div className="text-xs text-purple-600 mb-3">
+            <div style={{ fontSize: '0.75rem', color: '#7c3aed', marginBottom: '0.75rem' }}>
               Started: {new Date(swapanzaStartTime).toLocaleTimeString()}
             </div>
           )}
 
-          <div className="flex items-center justify-center space-x-4 text-sm">
-            <div className="bg-white px-3 py-1 rounded-full border border-purple-200">
-              <span className="text-purple-800">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '1rem',
+              fontSize: '0.875rem',
+            }}
+          >
+            <div
+              style={{
+                background: '#fff',
+                padding: '0.25rem 0.75rem',
+                borderRadius: 9999,
+                border: '1px solid #e9d5ff',
+              }}
+            >
+              <span style={{ color: '#6d28d9' }}>
                 You appear as: <strong>{swapanzaPartner?.username}</strong>
               </span>
             </div>
-            <div className="bg-purple-200 text-purple-800 px-3 py-1 rounded-full font-medium">
+            <div
+              style={{
+                background: '#ede9fe',
+                color: '#5b21b6',
+                padding: '0.25rem 0.75rem',
+                borderRadius: 9999,
+                fontWeight: 600,
+              }}
+            >
               Messages left: {remainingMessages}
             </div>
           </div>
@@ -61,15 +95,23 @@ function SwapanzaStatusBar({
     const isCurrentUserRequester = Number(swapanzaRequestedBy) === Number(currentUserId);
 
     return (
-      <div className="border-t p-4 bg-gradient-to-r from-yellow-50 to-yellow-100">
+      <div className="swapanza-pending">
         <div className="text-center">
-          <div className="flex items-center justify-center space-x-2 mb-3">
-            <span className="text-lg font-bold text-yellow-800">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              marginBottom: '0.75rem',
+            }}
+          >
+            <span style={{ fontSize: '1.125rem', fontWeight: 700, color: '#92400e' }}>
               {isCurrentUserRequester ? 'Swapanza Request Sent' : 'Swapanza Invitation'}
             </span>
           </div>
 
-          <div className="text-sm text-yellow-700 mb-3">
+          <div style={{ fontSize: '0.875rem', color: '#92400e', marginBottom: '0.75rem' }}>
             {isCurrentUserRequester ? (
               'Waiting for partner to confirm...'
             ) : (
@@ -79,23 +121,24 @@ function SwapanzaStatusBar({
             )}
           </div>
 
-          <div className="flex items-center justify-center space-x-3">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem',
+            }}
+          >
             {/* Confirm button for recipient */}
             {!userConfirmedSwapanza && !isCurrentUserRequester && (
-              <button
-                onClick={onConfirm}
-                className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-md"
-              >
+              <button onClick={onConfirm} className="btn-purple btn-sm">
                 Confirm Participation
               </button>
             )}
 
             {/* Cancel button for requester */}
             {isCurrentUserRequester && (
-              <button
-                onClick={onCancel}
-                className="px-4 py-2 bg-gray-200 text-gray-800 text-sm rounded-lg hover:bg-gray-300 transition-colors duration-200"
-              >
+              <button onClick={onCancel} className="btn-secondary btn-sm">
                 Cancel Invitation
               </button>
             )}
@@ -103,11 +146,11 @@ function SwapanzaStatusBar({
 
           {/* Confirmation status */}
           {userConfirmedSwapanza && partnerConfirmedSwapanza ? (
-            <div className="mt-3 bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm inline-block">
+            <div className="status-indicator status-indicator--green">
               Both confirmed! Starting Swapanza...
             </div>
           ) : userConfirmedSwapanza ? (
-            <div className="mt-3 bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm inline-block">
+            <div className="status-indicator status-indicator--blue">
               Waiting for partner confirmation...
             </div>
           ) : null}

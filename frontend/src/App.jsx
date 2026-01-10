@@ -31,20 +31,29 @@ function ScrollToTop() {
 
 function Navigation() {
   const { isAuth, username, logout } = useAuth();
+  const location = useLocation();
+  const path = location?.pathname || '';
 
   if (!isAuth) return null;
+
+  const onChats = path.startsWith('/chats');
+  const onProfile = path === '/profile' || path.startsWith('/profile/');
 
   return (
     <nav className="nav">
       <div className="container">
         <div className="flex-between py-4">
           <div className="nav-links">
-            <Link to="/chats" className="nav-link">
-              Chats
-            </Link>
-            <Link to="/profile" className="nav-link">
-              Profile
-            </Link>
+            {!onChats && (
+              <Link to="/chats" className="nav-link">
+                Chats
+              </Link>
+            )}
+            {!onProfile && (
+              <Link to="/profile" className="nav-link">
+                Profile
+              </Link>
+            )}
           </div>
           <div className="flex items-center space-x-4">
             <span className="nav-welcome">Welcome, {username}!</span>

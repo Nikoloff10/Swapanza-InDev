@@ -13,6 +13,7 @@ import { useChatWebSocket } from '../hooks/useChatWebSocket';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { useSwapanza } from '../hooks/useSwapanza';
 import { SWAPANZA } from '../constants';
+import useClickOutside from '../hooks/useClickOutside';
 import './styles/ChatModal.css';
 import './styles/Modal.css';
 
@@ -22,6 +23,10 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   const messagesEndRef = useRef(null);
   const onNewMessageRef = useRef(onNewMessage);
   const sendWsMessageRef = useRef(null);
+  const modalRef = useRef(null);
+
+  // Close when clicking outside modal or pressing Escape
+  useClickOutside(modalRef, onClose);
 
   useEffect(() => {
     onNewMessageRef.current = onNewMessage;
@@ -342,8 +347,21 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   // Loading state
   if (loading) {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content modal-chat">
+      <div
+        className="modal-overlay"
+        data-modal-root
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div
+          ref={modalRef}
+          className="modal-content modal-chat"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="modal-body-center">
             <div className="modal-loading">
               <div className="spinner spinner-large spinner-green" aria-hidden="true"></div>
@@ -358,8 +376,21 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   // Error state
   if (error) {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content modal-chat">
+      <div
+        className="modal-overlay"
+        data-modal-root
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div
+          ref={modalRef}
+          className="modal-content modal-chat"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="modal-body-center">
             <div className="modal-error">
               <h2 className="modal-title">Error Loading Chat</h2>
@@ -377,8 +408,21 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   // Chat not found state
   if (!chat) {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content modal-chat">
+      <div
+        className="modal-overlay"
+        data-modal-root
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div
+          ref={modalRef}
+          className="modal-content modal-chat"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="modal-body-center">
             <div className="modal-error">
               <h2 className="modal-title">Chat Not Found</h2>
@@ -394,8 +438,21 @@ function ChatModal({ chatId, onClose, onMessagesRead, onNewMessage, hasPendingSw
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content modal-chat">
+    <div
+      className="modal-overlay"
+      data-modal-root
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={modalRef}
+        className="modal-content modal-chat"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <ChatHeader
           otherParticipant={otherParticipant}

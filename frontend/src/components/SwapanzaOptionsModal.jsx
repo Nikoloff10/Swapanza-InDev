@@ -1,17 +1,34 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import './styles/SwapanzaOptionsModal.css';
 import PropTypes from 'prop-types';
 import { SWAPANZA } from '../constants';
+import useClickOutside from '../hooks/useClickOutside';
 
 /**
  * SwapanzaOptionsModal - Modal to configure and start a Swapanza session
  */
 function SwapanzaOptionsModal({ isOpen, duration, onDurationChange, onStart, onClose }) {
+  const modalRef = useRef(null);
+  useClickOutside(modalRef, onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content modal-md">
+    <div
+      className="modal-overlay"
+      data-modal-root
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={modalRef}
+        className="modal-content modal-md"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="p-6">
           <h3 className="modal-subtitle mb-4">Start Swapanza</h3>
 

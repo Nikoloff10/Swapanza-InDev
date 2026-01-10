@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaClock, FaInfoCircle, FaCheck, FaTimes } from 'react-icons/fa';
 import { SWAPANZA, INTERVALS } from '../constants';
+import useClickOutside from '../hooks/useClickOutside';
 import './styles/SwapanzaModal.css';
 
 function SwapanzaModal({
@@ -41,11 +42,27 @@ function SwapanzaModal({
     };
   }, [isOpen, onClose]);
 
+  const modalRef = useRef(null);
+  useClickOutside(modalRef, onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content modal-md">
+    <div
+      className="modal-overlay"
+      data-modal-root
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={modalRef}
+        className="modal-content modal-md"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="modal-header-gradient">
           <div>

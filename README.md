@@ -6,6 +6,11 @@ Swapanza is a real-time chat application with a unique twist: users can temporar
 
 ---
 
+## DISCLAIMER:
+
+For the sake of maintaining notification, chat history and message loading functionalities ALL of the sent messages
+are saved to the database.
+
 ## Setup & Installation
 
 ### Option 1: Docker (Recommended)

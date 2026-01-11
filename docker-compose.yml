@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   # PostgreSQL Database
@@ -35,7 +35,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: swapanzaBackend/Dockerfile
+      dockerfile: backend/Dockerfile
     environment:
       - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
@@ -78,7 +78,7 @@ services:
   celery:
     build:
       context: .
-      dockerfile: swapanzaBackend/Dockerfile
+      dockerfile: backend/Dockerfile
     environment:
       - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
@@ -94,13 +94,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A swapanzaBackend worker --loglevel=info
+    command: celery -A backend worker --loglevel=info
 
   # Celery Beat (for scheduled tasks like cleanup)
   celery-beat:
     build:
       context: .
-      dockerfile: swapanzaBackend/Dockerfile
+      dockerfile: backend/Dockerfile
     environment:
       - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
@@ -118,7 +118,7 @@ services:
         condition: service_healthy
       celery:
         condition: service_started
-    command: celery -A swapanzaBackend beat --loglevel=info
+    command: celery -A backend beat --loglevel=info
 
 volumes:
   postgres_data:

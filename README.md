@@ -1,6 +1,7 @@
 # Swapanza
 
 ## Project Overview
+
 Swapanza is a real-time chat application with a unique twist: users can temporarily swap their identities during conversations. It features JWT authentication, real-time messaging, Swapanza mode, and robust security best practices.
 
 ---
@@ -24,6 +25,7 @@ docker-compose up -d --build
 ```
 
 This will start:
+
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **PostgreSQL**: localhost:5432
@@ -31,6 +33,7 @@ This will start:
 - **Celery Worker**: Background task processing
 
 #### Docker Commands:
+
 ```sh
 # View logs
 docker-compose logs -f
@@ -57,12 +60,14 @@ docker-compose exec backend python manage.py createsuperuser
 ### Option 2: Local Development
 
 #### 1. Clone the Repository
+
 ```sh
 git clone <repo-url>
 cd Swapanza
 ```
 
 #### 2. Python Backend Setup
+
 - Create and activate a virtual environment:
   ```sh
   python -m venv .venv
@@ -83,6 +88,7 @@ cd Swapanza
   ```
 
 #### 3. Frontend Setup
+
 - Go to the frontend directory:
   ```sh
   cd frontend
@@ -97,20 +103,23 @@ cd Swapanza
   ```
 
 #### 4. Redis & Celery (for real-time and background tasks)
+
 - Start Redis server (see Redis docs for your OS).
 - Start Celery worker:
   ```sh
-  celery -A swapanzaBackend worker --loglevel=info --pool=solo
+  celery -A backend worker --loglevel=info --pool=solo
   ```
 - Start Celery beat (for scheduled tasks):
   ```sh
-  celery -A swapanzaBackend beat --loglevel=info
+  celery -A backend beat --loglevel=info
   ```
 
 ---
 
 ## Environment Variables
+
 Create a `.env` file in the project root with the following (example):
+
 ```
 # Database Configuration
 POSTGRES_DB=swapanza
@@ -123,7 +132,7 @@ CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 
 # Django Configuration
-DJANGO_SETTINGS_MODULE=swapanzaBackend.settings
+DJANGO_SETTINGS_MODULE=backend.settings
 DJANGO_SECRET_KEY=your-secret-key-here-generate-a-new-one
 DJANGO_DEBUG=True
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend
@@ -146,7 +155,8 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 
 ---
 
-## Security & Best Practices
+## Security
+
 - All sensitive settings are controlled via environment variables.
 - CORS and CSRF are locked down for production.
 - All endpoints require authentication.
@@ -157,6 +167,7 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 ---
 
 ## Upgrading & Maintenance
+
 - To upgrade frontend dependencies:
   ```sh
   cd frontend
@@ -171,15 +182,7 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 ---
 
 ## UI/UX & Bugfixes
+
 - The frontend uses toast notifications for all user-facing errors.
 - All major flows are tested for React 19 and React Router 7 compatibility.
 - If you find a bug, check the browser console and backend logs for details.
-
----
-
-
-## License
-MIT
-````
-
-

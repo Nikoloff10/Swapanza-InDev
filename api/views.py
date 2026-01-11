@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.views.decorators.csrf import csrf_exempt
 import cloudinary.uploader
-from swapanzaBackend import settings
+from backend import settings
 from .models import Chat, Message, SwapanzaSession
 from .serializers import ChatSerializer, ChatSerializerLight, MessageSerializer, UserSerializer
 from django.contrib.auth import get_user_model

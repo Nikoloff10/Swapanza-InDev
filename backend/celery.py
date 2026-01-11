@@ -3,9 +3,9 @@ from celery import Celery
 from django.conf import settings
 
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'swapanzaBackend.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 
-app = Celery('swapanzaBackend')
+app = Celery('backend')
 
 
 
@@ -18,7 +18,7 @@ app.autodiscover_tasks()
 app.conf.beat_schedule = {
     
     'check-expired-swapanzas': {
-        'task': 'chat.tasks.check_expired_swapanzas',
+        'task': 'api.tasks.check_expired_swapanzas',
         'schedule': 10.0,  
     },
 }

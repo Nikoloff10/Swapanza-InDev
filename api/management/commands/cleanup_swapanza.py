@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from chat.models import Chat, SwapanzaSession
+from api.models import Chat, SwapanzaSession
 
 class Command(BaseCommand):
     help = 'Clean up corrupted Swapanza state'

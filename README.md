@@ -14,7 +14,7 @@ The easiest way to run Swapanza is using Docker Compose, which sets up all servi
 
 ```sh
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/Nikoloff10/Swapanza-InDev
 cd Swapanza
 
 # Build and start all services
@@ -62,7 +62,7 @@ docker-compose exec backend python manage.py createsuperuser
 #### 1. Clone the Repository
 
 ```sh
-git clone <repo-url>
+git clone https://github.com/Nikoloff10/Swapanza-InDev
 cd Swapanza
 ```
 
